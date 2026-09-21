@@ -19,16 +19,17 @@ export default function TodayPage() {
   useEffect(() => {
     if (!household) return;
     (async () => {
+      // Altı ayrı istek yerine tek anlık görüntü + hafta şeridi (0004_bootstrap.sql).
       const period = periodOf(T);
-      const [agenda, month, budget, shopping, notifs, weekEvents] = await Promise.all([
-        repo.summary.agenda(T, 7), repo.summary.month(period), repo.summary.budgetStatus(period),
-        repo.shopping.items(), repo.notifications.list(), repo.events.list({ from: weekDays(T)[0], to: weekDays(T)[6] }),
+      const [snap, weekEvents] = await Promise.all([
+        repo.summary.today(T, 7, period),
+        repo.events.list({ from: weekDays(T)[0], to: weekDays(T)[6] }),
       ]);
-      setData({ agenda, month, budget, shopping, notifs, weekEvents });
+      setData({ ...snap, weekEvents });
     })();
   }, [repo, household, tick, T]);
 
-  if (!data) return <Empty>{t('common.loading')}</Empty>;
+  if (!data) return <TodaySkeleton />;
   const { agenda, month, budget, shopping, notifs, weekEvents } = data;
   const todays = agenda.events.filter((e) => e.date === T);
   const total = budget.find((b) => b.category_id === null);
@@ -38,6 +39,13 @@ export default function TodayPage() {
   const todayTasks = agenda.tasks.filter((k) => !k.due_on || k.due_on <= T);
   const wd = weekDays(T);
   const DOW = dowNames();
+
+  // İlk kullanım: hanede hiç veri yok. Beş tane boş kart göstermek yerine
+  // ne yapılacağını söyleyen tek bir kart göster.
+  const upcomingCount = agenda.documents.length + agenda.bills.length + agenda.occasions.length
+    + agenda.events.filter((e) => e.date > T).length;
+  const isFirstRun = weekEvents.length === 0 && upcomingCount === 0 && todayTasks.length === 0
+    && openShopping.length === 0 && month.expense === 0 && month.income === 0;
 
   return (
     <>
@@ -74,6 +82,8 @@ export default function TodayPage() {
         </div>
       </Card>
 
+      {isFirstRun ? <StartCard onQuick={app.openQuick} /> : <>
+
       {/* Bugünün ajandası */}
       <Card title={t('today.agenda')}>
         {todays.length === 0 ? <Empty>{t('today.noEvents')}</Empty> : todays.map((e) => (
@@ -105,15 +115,20 @@ export default function TodayPage() {
           )}
         </div>
         {bs && <div style={{ margin: 'var(--sp-3) 0 var(--sp-2)' }}><Bar pct={bs.pct} state={bs.state} /></div>}
-        <div className="faint" style={{ marginBottom: 'var(--sp-2)' }}>{t('today.top3')}</div>
-        <div className="inline">
-          {month.by_category.slice(0, 3).map((c) => (
-            <span key={c.category_id} className="tag" style={{ background: 'rgba(255,255,255,.18)', color: 'inherit' }}>{c.icon} {c.name} · {formatMoney(c.total, baseCurrency, { compact: true })}</span>
-          ))}
-        </div>
+        {month.by_category.length > 0 && (
+          <>
+            <div className="faint" style={{ marginBottom: 'var(--sp-2)' }}>{t('today.top3')}</div>
+            <div className="inline">
+              {month.by_category.slice(0, 3).map((c) => (
+                <span key={c.category_id} className="tag" style={{ background: 'rgba(255,255,255,.18)', color: 'inherit' }}>{c.icon} {c.name} · {formatMoney(c.total, baseCurrency, { compact: true })}</span>
+              ))}
+            </div>
+          </>
+        )}
       </Card>
 
-      {/* Yaklaşanlar */}
+      {/* Yaklaşanlar — boşken kart hiç çizilmez (üst üste boş kutu görünmesin) */}
+      {upcomingCount > 0 && (
       <Card title={t('today.upcoming')}>
         {agenda.documents.map((d) => (
           <Row key={d.id} icon="🪪" title={d.title} sub={d.daysLeft < 0 ? t('family.expired') : t('family.expiresIn', d.daysLeft)} end={<span className={'tag ' + (d.daysLeft <= 30 ? 'tag--danger' : 'tag--warn')}>{fmtDay(d.expires_on)}</span>} />
@@ -127,17 +142,21 @@ export default function TodayPage() {
         {agenda.events.filter((e) => e.date > T).slice(0, 4).map((e) => (
           <Row key={e.id + e.date} icon="📅" title={e.title} sub={`${relativeLabel(e.date)} · ${e.all_day ? t('calendar.allDay') : fmtTime(e.starts_at)}`} end={<Avatars members={(e.attendees || []).map(memberById).filter(Boolean)} />} />
         ))}
-        {!agenda.documents.length && !agenda.bills.length && !agenda.occasions.length && <Empty>{t('common.empty')}</Empty>}
       </Card>
+      )}
 
-      {/* Görevler */}
+      {/* Görevler — boşken çizilmez */}
+      {todayTasks.length > 0 && (
       <Card title={t('today.tasksDue')} action={<Link className="faint" href="/aile/?tab=tasks">{t('common.seeAll')} →</Link>}>
-        {todayTasks.length === 0 ? <Empty>{t('common.empty')}</Empty> : todayTasks.map((k) => (
+        {todayTasks.map((k) => (
           <Row key={k.id} icon={<input type="checkbox" checked={k.is_done} onChange={async () => { await repo.tasks.toggle(k.id); bump(); }} style={{ width: 22, height: 22 }} />}
             title={k.title} sub={memberById(k.assignee_member_id)?.display_name} done={k.is_done}
             end={k.points ? <span className="tag tag--ok">⭐ {k.points}</span> : null} />
         ))}
       </Card>
+      )}
+
+      </>}
 
       {/* Alışveriş */}
       <Card title={`🛒 ${t('today.shopping')}`} action={<span className="faint">{t('today.itemsLeft', openShopping.length)}</span>}>
@@ -148,5 +167,37 @@ export default function TodayPage() {
         <ShoppingForm />
       </Card>
     </>
+  );
+}
+
+/** Hane bomboşken gösterilen tek yönlendirme kartı. */
+function StartCard({ onQuick }) {
+  const t = useT();
+  return (
+    <section className="start" style={{ marginBottom: 'var(--sp-3)' }}>
+      <div className="start__title">{t('today.start.title')}</div>
+      <p className="start__body">{t('today.start.body')}</p>
+      <div className="start__list">
+        <button type="button" className="start__item" onClick={onQuick}>
+          <span className="start__num">1</span>{t('today.start.expense')}<span>→</span>
+        </button>
+        <Link className="start__item" href="/takvim/">
+          <span className="start__num">2</span>{t('today.start.event')}<span>→</span>
+        </Link>
+        <Link className="start__item" href="/aile/">
+          <span className="start__num">3</span>{t('today.start.family')}<span>→</span>
+        </Link>
+      </div>
+    </section>
+  );
+}
+
+// Veri gelene kadar boş ekran yerine kart iskeleti; ekran donmuş gibi görünmesin.
+function TodaySkeleton() {
+  return (
+    <div aria-busy="true">
+      <div className="skel skel--title" />
+      {[96, 132, 120].map((h, i) => <div key={i} className="skel skel--card" style={{ height: h }} />)}
+    </div>
   );
 }

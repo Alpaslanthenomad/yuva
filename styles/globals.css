@@ -18,7 +18,9 @@ ul { margin: 0; padding: 0; list-style: none; }
 .shell { min-height: 100dvh; display: flex; flex-direction: column; }
 .shell__main {
   flex: 1; width: 100%; max-width: var(--max-w); margin: 0 auto;
-  padding: calc(var(--sp-4) + var(--safe-t)) var(--sp-4) calc(var(--nav-h) + var(--safe-b) + var(--sp-8));
+  /* Alt boşluk FAB'ın yüksekliğini de kapsar; yoksa '+' butonu son kartın
+     üzerine biniyordu (Alışveriş kartındaki "Ekle" tuşunu örtüyordu). */
+  padding: calc(var(--sp-4) + var(--safe-t)) var(--sp-4) calc(var(--nav-h) + var(--safe-b) + 92px);
 }
 @media (min-width: 900px) {
   .shell__main { padding-bottom: var(--sp-8); padding-left: 260px; max-width: 1100px; }
@@ -36,7 +38,7 @@ ul { margin: 0; padding: 0; list-style: none; }
   gap: 2px; font-size: var(--fs-xs); color: var(--color-text-3); min-height: var(--tap);
 }
 .nav__item--active { color: var(--color-brand); font-weight: 600; }
-.nav__icon { font-size: 22px; line-height: 1; }
+.nav__icon { display: grid; place-items: center; width: 24px; height: 24px; }
 @media (min-width: 900px) {
   .nav {
     top: 0; bottom: 0; right: auto; width: 240px; height: auto;
@@ -111,8 +113,22 @@ ul { margin: 0; padding: 0; list-style: none; }
   background: var(--color-surface); border: 1px solid var(--color-border); color: var(--color-text-2); min-height: 36px;
 }
 .chip--active { background: var(--color-brand); color: var(--color-on-brand); border-color: var(--color-brand); }
-.seg { display: inline-flex; background: var(--color-surface-2); border-radius: var(--radius-pill); padding: 3px; }
-.seg__btn { padding: 7px 14px; border-radius: var(--radius-pill); font-size: var(--fs-sm); font-weight: 600; color: var(--color-text-2); }
+/* Telefonda sekmeler ekrana sığmıyordu ("Hesaplar" kesiliyordu) — yatay kaydırılır. */
+.seg {
+  display: flex; background: var(--color-surface-2); border-radius: var(--radius-pill); padding: 3px;
+  max-width: 100%; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+}
+.seg::-webkit-scrollbar { display: none; }
+/* Sağ kenarda yumuşama: sekmelerin kesilmesi hata gibi değil,
+   "devamı var, kaydır" gibi okunsun. */
+@media (max-width: 560px) {
+  .seg { -webkit-mask-image: linear-gradient(to right, #000 85%, transparent 100%);
+                 mask-image: linear-gradient(to right, #000 85%, transparent 100%); }
+}
+.seg__btn {
+  flex: 0 0 auto; white-space: nowrap;
+  padding: 7px 14px; border-radius: var(--radius-pill); font-size: var(--fs-sm); font-weight: 600; color: var(--color-text-2);
+}
 .seg__btn--active { background: var(--color-surface); color: var(--color-text); box-shadow: var(--shadow-1); }
 
 /* ---------- Üye avatarları ---------- */
@@ -224,3 +240,35 @@ ul { margin: 0; padding: 0; list-style: none; }
 .spacer { height: var(--sp-4); }
 .inline { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
 .between { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); }
+
+/* ---------- İlk kullanım kartı ----------
+   Yeni bir hane bomboş açılıyor ve ekran üst üste "Henüz bir şey yok"
+   kutularından ibaret kalıyordu. Onun yerine tek bir yönlendirme kartı. */
+.start { background: var(--color-surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-1); padding: var(--sp-5); }
+.start__title { font-size: var(--fs-xl); font-weight: 700; margin-bottom: var(--sp-2); }
+.start__body { color: var(--color-text-2); font-size: var(--fs-sm); margin-bottom: var(--sp-4); }
+.start__list { display: grid; gap: var(--sp-2); }
+.start__item {
+  display: flex; align-items: center; gap: var(--sp-3); width: 100%; text-align: left;
+  min-height: var(--tap); padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--color-border); border-radius: var(--radius-md);
+  background: var(--color-surface); color: var(--color-text); font-size: var(--fs-md); font-weight: 600;
+}
+.start__item:active { background: var(--color-surface-2); }
+.start__item span:last-child { margin-left: auto; color: var(--color-text-3); font-weight: 400; }
+.start__num {
+  flex: 0 0 auto; width: 26px; height: 26px; border-radius: var(--radius-pill);
+  display: grid; place-items: center; font-size: var(--fs-sm); font-weight: 700;
+  background: var(--color-brand-soft); color: var(--color-brand);
+}
+
+/* ---------- Yükleniyor iskeleti ----------
+   Veri beklenirken ortada tek başına "Yükleniyor…" yazısı vardı; ekran
+   donmuş gibi görünüyordu. Yerine kartların yerini tutan gri bloklar. */
+@keyframes skel-pulse { 0%, 100% { opacity: .55; } 50% { opacity: .95; } }
+.skel {
+  background: var(--color-surface-2); border-radius: var(--radius-lg);
+  margin-bottom: var(--sp-3); animation: skel-pulse 1.4s ease-in-out infinite;
+}
+.skel--title { height: 34px; width: 60%; border-radius: var(--radius-md); margin-bottom: var(--sp-4); }
+@media (prefers-reduced-motion: reduce) { .skel { animation: none; } }

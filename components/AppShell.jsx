@@ -23,7 +23,11 @@ export default function AppShell({ children }) {
       const base = await repo.init();
       if (!base.household) { setState((s) => ({ ...s, ...base, loading: false })); return base; }
       applyHouseholdDefault(base.household.locale);
-      const [accounts, categories, rates] = await Promise.all([repo.accounts.list(), repo.categories.list(), repo.fx.rates()]);
+      // supabaseRepo.init() hesap/kategori/kuru zaten tek pakette getirir (0004).
+      // demoRepo getirmediği için orada eski yoldan tamamlanır.
+      const [accounts, categories, rates] = base.categories
+        ? [base.accounts, base.categories, base.rates]
+        : await Promise.all([repo.accounts.list(), repo.categories.list(), repo.fx.rates()]);
       setState({ ...base, accounts, categories, rates, loading: false });
       return base;   // çağıran (giriş ekranı) haneyi görüp görmediğini bilsin
     } catch (e) {

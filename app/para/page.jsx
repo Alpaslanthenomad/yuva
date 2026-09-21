@@ -10,12 +10,15 @@ import { formatMoney, budgetState, dailyAllowance, parseAmount, minorToDecimal }
 const TABS = ['overview', 'transactions', 'budgets', 'bills', 'accounts'];
 
 export default function MoneyPage() {
-  const { repo, household, baseCurrency, categoryById, memberById, accountById, categories, tick, bump } = useApp();
+  const { repo, household, baseCurrency, categoryById, memberById, accountById, categories, members, tick, bump } = useApp();
   const t = useT();
   const [tab, setTab] = useState('overview');
   const [period, setPeriod] = useState(periodOf(today()));
   const [d, setD] = useState(null);
   const [adding, setAdding] = useState(false);
+  const [editTxn, setEditTxn] = useState(null);      // düzenlenen işlem
+  const [fMember, setFMember] = useState('');        // filtre: kim için
+  const [fCategory, setFCategory] = useState('');    // filtre: kategori
 
   useEffect(() => {
     if (!household) return;
@@ -80,6 +83,7 @@ export default function MoneyPage() {
           <div className="grid-2">
             <Card title={t('money.byMember')}>
               {month.by_member.map((m) => <Row key={m.member_id} title={m.name} end={<span className="money">{formatMoney(m.total, baseCurrency, { compact: true })}</span>} />)}
+              {month.by_member.length === 0 && <Empty>{t('common.empty')}</Empty>}
             </Card>
             <Card title={`${t('money.fixed')} / ${t('money.variable')}`}>
               <Row title={t('money.fixed')} end={<span className="money">{formatMoney(month.fixed || 0, baseCurrency, { compact: true })}</span>} />
@@ -89,20 +93,53 @@ export default function MoneyPage() {
         </>
       )}
 
-      {tab === 'transactions' && (
-        <Card>
-          {txns.map((x) => {
-            const c = categoryById(x.category_id);
-            return (
-              <Row key={x.id} icon={x.kind === 'transfer' ? '🔁' : c?.icon || '🏷️'} title={x.merchant || c?.name || t('money.' + x.kind)}
-                sub={`${fmtDay(x.occurred_on)} · ${accountById(x.account_id)?.name || ''}${x.for_member_id ? ' · ' + memberById(x.for_member_id)?.display_name : ''}${x.plan_id ? ' · 🧭' : ''}`}
-                end={<div><Money amount={x.amount} currency={x.currency} kind={x.kind} />{x.currency !== baseCurrency && <div className="faint">≈ {formatMoney(x.amount_base, baseCurrency)}</div>}</div>}
-                onClick={async () => { if (confirm(t('common.confirmDelete', x.merchant || t('money.' + x.kind)))) { await repo.transactions.remove(x.id); bump(); } }} />
-            );
-          })}
-          {txns.length === 0 && <Empty>{t('common.empty')}</Empty>}
-        </Card>
-      )}
+      {tab === 'transactions' && (() => {
+        // Filtre yalnızca görüntüyü daraltır; toplamlar filtreye göre yeniden hesaplanır.
+        const shown = txns.filter((x) =>
+          (!fMember || x.for_member_id === fMember) &&
+          (!fCategory || x.category_id === fCategory || categoryById(x.category_id)?.parent_id === fCategory));
+        const shownTotal = shown.filter((x) => x.kind === 'expense')
+          .reduce((s, x) => s + Number(x.amount_base ?? x.amount), 0);
+        return (
+          <>
+            <div className="grid-2" style={{ marginBottom: 'var(--sp-3)' }}>
+              <Field label={t('money.forWhom')}>
+                <select className="select" value={fMember} onChange={(e) => setFMember(e.target.value)}>
+                  <option value="">{t('common.all')}</option>
+                  {members.map((m) => <option key={m.id} value={m.id}>{m.avatar_emoji} {m.display_name}</option>)}
+                </select>
+              </Field>
+              <Field label={t('money.category')}>
+                <select className="select" value={fCategory} onChange={(e) => setFCategory(e.target.value)}>
+                  <option value="">{t('common.all')}</option>
+                  {categories.filter((c) => !c.parent_id).map((c) => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+                </select>
+              </Field>
+            </div>
+            <Card>
+              {shown.map((x) => {
+                const c = categoryById(x.category_id);
+                return (
+                  <Row key={x.id} icon={x.kind === 'transfer' ? '🔁' : c?.icon || '🏷️'} title={x.merchant || c?.name || t('money.' + x.kind)}
+                    sub={`${fmtDay(x.occurred_on)} · ${accountById(x.account_id)?.name || ''}${x.for_member_id ? ' · ' + memberById(x.for_member_id)?.display_name : ''}${x.plan_id ? ' · 🧭' : ''}`}
+                    end={<div><Money amount={x.amount} currency={x.currency} kind={x.kind} />{x.currency !== baseCurrency && <div className="faint">≈ {formatMoney(x.amount_base, baseCurrency)}</div>}</div>}
+                    onClick={() => setEditTxn(x)} />
+                );
+              })}
+              {shown.length === 0 && <Empty>{t('common.empty')}</Empty>}
+              {shown.length > 0 && (
+                <>
+                  <div className="spacer" />
+                  <div className="between">
+                    <span className="muted">{t('money.shownTotal', shown.length)}</span>
+                    <span className="money money--expense">{formatMoney(shownTotal, baseCurrency)}</span>
+                  </div>
+                </>
+              )}
+            </Card>
+          </>
+        );
+      })()}
 
       {tab === 'budgets' && <BudgetsTab t={t} budget={budget} period={period} baseCurrency={baseCurrency} categories={categories} repo={repo} bump={bump} />}
 
@@ -128,6 +165,11 @@ export default function MoneyPage() {
       )}
 
       {adding && <Sheet onClose={() => setAdding(false)} title={t('money.addTxn')}><ExpenseForm onDone={() => setAdding(false)} /></Sheet>}
+      {editTxn && (
+        <Sheet onClose={() => setEditTxn(null)} title={t('money.editTxn')}>
+          <ExpenseForm txn={editTxn} onDone={() => setEditTxn(null)} />
+        </Sheet>
+      )}
     </>
   );
 }
@@ -135,28 +177,62 @@ export default function MoneyPage() {
 function BudgetsTab({ t, budget, period, baseCurrency, categories, repo, bump }) {
   const [catId, setCatId] = useState('');
   const [amt, setAmt] = useState('');
+  const [removing, setRemoving] = useState(null);   // silinmeyi bekleyen zarf
   const parents = categories.filter((c) => c.kind === 'expense' && !c.parent_id);
+
   const save = async (e) => {
     e.preventDefault();
     const minor = parseAmount(amt, baseCurrency); if (!minor) return;
     await repo.budgets.set({ period, category_id: catId || null, amount_base: minorToDecimal(minor, baseCurrency) });
     setAmt(''); bump();
   };
+
+  // Satıra basınca o zarf forma yüklenir; kaydet üzerine yazar.
+  const edit = (b) => {
+    setCatId(b.category_id || '');
+    setAmt(String(minorToDecimal(b.budget, baseCurrency)));
+    setRemoving(null);
+  };
+
+  const over = budget.filter((b) => budgetState(b.spent, b.budget).state === 'over');
+  const warn = budget.filter((b) => budgetState(b.spent, b.budget).state === 'warn');
+  const isThisMonth = period === periodOf(today());
+
   return (
     <>
+      {over.length > 0 && (
+        <div className="banner" style={{ color: 'var(--color-danger)' }}>
+          {t('money.overWarning', over.map((b) => b.category_id ? b.category_name : t('money.totalBudget')).join(', '))}
+        </div>
+      )}
+      {over.length === 0 && warn.length > 0 && (
+        <div className="banner" style={{ color: 'var(--color-warn)' }}>
+          {t('money.nearWarning', warn.map((b) => b.category_id ? b.category_name : t('money.totalBudget')).join(', '))}
+        </div>
+      )}
+
       <Card>
         {budget.map((b) => {
           const st = budgetState(b.spent, b.budget);
+          const perDay = isThisMonth && b.remaining > 0 ? dailyAllowance(b.remaining) : null;
           return (
-            <Row key={b.category_id || 'total'} icon={b.icon} title={b.category_id ? b.category_name : t('money.totalBudget')} end={<span className={'tag ' + (st.state === 'over' ? 'tag--danger' : st.state === 'warn' ? 'tag--warn' : 'tag--ok')}>{t('common.pct', Math.round(b.pct))}</span>}>
-              <div className="faint">{formatMoney(b.spent, baseCurrency)} / {formatMoney(b.budget, baseCurrency)} · {b.remaining >= 0 ? formatMoney(b.remaining, baseCurrency) + ' ' + t('money.left') : formatMoney(-b.remaining, baseCurrency) + ' ' + t('money.over')}</div>
+            <Row key={b.category_id || 'total'} icon={b.icon} title={b.category_id ? b.category_name : t('money.totalBudget')}
+              onClick={() => edit(b)}
+              end={<span className={'tag ' + (st.state === 'over' ? 'tag--danger' : st.state === 'warn' ? 'tag--warn' : 'tag--ok')}>{t('common.pct', Math.round(st.rawPct ?? b.pct))}</span>}>
+              <div className="faint">
+                {formatMoney(b.spent, baseCurrency)} / {formatMoney(b.budget, baseCurrency)} · {b.remaining >= 0
+                  ? formatMoney(b.remaining, baseCurrency) + ' ' + t('money.left')
+                  : formatMoney(-b.remaining, baseCurrency) + ' ' + t('money.over')}
+                {perDay !== null && ` · ${formatMoney(perDay, baseCurrency)} / ${t('today.perDay')}`}
+              </div>
               <div style={{ marginTop: 6 }}><Bar pct={b.pct} state={st.state} /></div>
             </Row>
           );
         })}
         {budget.length === 0 && <Empty>{t('money.noBudget')}</Empty>}
       </Card>
-      <Card title={`+ ${t('money.addBudget')}`}>
+
+      <Card title={catId || amt ? t('money.editBudget') : `+ ${t('money.addBudget')}`}>
         <form onSubmit={save} className="grid-3" style={{ alignItems: 'end' }}>
           <Field label={t('money.category')}>
             <select className="select" value={catId} onChange={(e) => setCatId(e.target.value)}>
@@ -167,6 +243,16 @@ function BudgetsTab({ t, budget, period, baseCurrency, categories, repo, bump })
           <Field label={`${t('money.amount')} (${baseCurrency})`}><input className="input" inputMode="decimal" value={amt} onChange={(e) => setAmt(e.target.value)} /></Field>
           <button className="btn" style={{ marginBottom: 'var(--sp-4)' }}>{t('common.save')}</button>
         </form>
+        {budget.some((b) => (b.category_id || '') === catId) && (
+          removing === catId ? (
+            <div className="grid-2">
+              <button type="button" className="btn btn--ghost" onClick={() => setRemoving(null)}>{t('common.cancel')}</button>
+              <button type="button" className="btn btn--danger" onClick={async () => { await repo.budgets.remove(period, catId || null); setRemoving(null); setAmt(''); bump(); }}>{t('common.yesDelete')}</button>
+            </div>
+          ) : (
+            <button type="button" className="btn btn--ghost btn--block" onClick={() => setRemoving(catId)}>{t('money.removeBudget')}</button>
+          )
+        )}
       </Card>
     </>
   );

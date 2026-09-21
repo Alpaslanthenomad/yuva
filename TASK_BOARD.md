@@ -42,7 +42,15 @@ Faz tanımları `PROJECT_BLUEPRINT.md §5`.
 - [x] Ayarlar › Şifre değiştirme — 2026-09-21
 - [x] İlk hane kuruldu ("Bizim Ev", CLP, TR); 52 kategori tohumlandı — 2026-09-21
 - [ ] Supabase: "Confirm email" kapatılsın (eşin hesap açabilmesi için)
-- [ ] `supabaseRepo` tüm contract metodlarını gerçek sorgularla doldur (şu an iskelet)
+- [x] İlk kullanım deneyimi: boş hanede tek yönlendirme kartı; boş kartlar çizilmiyor — 2026-09-21
+- [x] Açılış hızı: 10 istek → 2 (`app_bootstrap` + `today_snapshot`, migration 0004).
+      Oturum açıkken yenileme ~8 sn → ~1 sn — 2026-09-21
+- [x] Yükleniyor yazısı yerine kart iskeleti — 2026-09-21
+- [x] Alt menü emoji → çizgi ikon; `+` butonu içeriğin üstüne binmiyor;
+      Para sekmeleri kaydırılabilir; "Üyeye göre" boş durumu — 2026-09-21
+- [x] Aile: üye düzenleme + haneden çıkarma (soft delete) — 2026-09-21
+- [ ] Vercel: Deployment Protection kapatılsın (eş siteyi açamıyor)
+- [ ] `supabaseRepo` kalan contract metodlarını gerçek sorgularla doldur
 - [ ] Takvim: hafta görünümü sürükle-kaydır; RRULE düzenleme UI; çakışma uyarısı
 - [ ] Para: işlem düzenleme/silme; filtre (ay/üye/kategori/hesap); rapor grafikleri
 - [ ] Para: düzenli kurallar → `post_due_recurring` için Supabase cron (pg_cron) kurulumu

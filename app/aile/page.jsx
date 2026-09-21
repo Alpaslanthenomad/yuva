@@ -2,19 +2,31 @@
 import { useEffect, useState } from 'react';
 import { useApp } from '../../components/AppShell.jsx';
 import { Card, Row, Chips, Empty, Sheet, Field, Avatar } from '../../components/ui.jsx';
-import { TaskForm, ShoppingForm } from '../../components/QuickAdd.jsx';
+import { TaskForm, ShoppingForm, ExpenseForm } from '../../components/QuickAdd.jsx';
 import { useT } from '../../lib/i18n/context.jsx';
 import { today, fmtDay, relativeLabel, weekDays } from '../../lib/dates.js';
 
 const TABS = ['members', 'occasions', 'documents', 'tasks', 'shopping'];
+
+/**
+ * Alışverişi harcamaya çevirirken kategoriyi tahmin et.
+ * Kategori adları haneye göre TR veya ES tohumlandığı için isimden bakılır;
+ * bulunamazsa boş döner ve kullanıcı kendi seçer.
+ */
+function guessGroceryCategory(categories) {
+  const re = /market|süpermarket|supermercado|gıda|alimento/i;
+  return categories.find((c) => c.kind === 'expense' && re.test(c.name))?.id || '';
+}
 const DOC_ICON = { passport: '🛂', id: '🪪', license: '🚗', visa: '🛃', insurance: '🛡️', contract: '📄', vehicle: '🔧', other: '📎' };
 
 export default function FamilyPage() {
-  const { repo, members, household, memberById, tick, bump } = useApp();
+  const { repo, members, household, memberById, tick, bump, me, categories } = useApp();
   const t = useT();
   const [tab, setTab] = useState('members');
   const [d, setD] = useState(null);
   const [sheet, setSheet] = useState(null);
+  const [editing, setEditing] = useState(null);   // düzenlenen üye; null ise yeni kayıt
+  const [toExpense, setToExpense] = useState(null);   // harcamaya çevrilecek alışveriş kalemleri
 
   useEffect(() => { try { const x = new URLSearchParams(window.location.search).get('tab'); if (x && TABS.includes(x)) setTab(x); } catch { /* */ } }, []);
   useEffect(() => {
@@ -40,11 +52,14 @@ export default function FamilyPage() {
               const pts = d.tasks.filter((k) => k.assignee_member_id === m.id && k.is_done && k.done_at && k.done_at.slice(0, 10) >= wk[0]).reduce((s, k) => s + (k.points || 0), 0);
               return (
                 <Row key={m.id} icon={<Avatar member={m} />} title={m.display_name} sub={`${t('family.roles.' + m.role)}${m.birthdate ? ' · ' + fmtDay(m.birthdate) + ' ' + m.birthdate.slice(0, 4) : ''}`}
-                  end={m.role === 'child' ? <span className="tag tag--ok">⭐ {pts} {t('family.weeklyStars')}</span> : null} />
+                  onClick={() => { setEditing(m); setSheet('member'); }}
+                  end={m.role === 'child'
+                    ? <span className="tag tag--ok">⭐ {pts} {t('family.weeklyStars')}</span>
+                    : <span className="faint" aria-hidden>›</span>} />
               );
             })}
           </Card>
-          <button className="btn btn--outline btn--block" onClick={() => setSheet('member')}>+ {t('family.addMember')}</button>
+          <button className="btn btn--outline btn--block" onClick={() => { setEditing(null); setSheet('member'); }}>+ {t('family.addMember')}</button>
           <div className="spacer" />
           <div className="faint">{t('settings.joinCode')}: <span className="mono">{household.join_code}</span> — {t('family.childrenNoAccount')}</div>
         </>
@@ -92,31 +107,95 @@ export default function FamilyPage() {
         </>
       )}
 
+      {tab === 'shopping' && d.lists.length === 0 && (
+        <Card><Empty>{t('family.noList')}</Empty></Card>
+      )}
       {tab === 'shopping' && d.lists.map((l) => {
         const items = d.items.filter((i) => i.list_id === l.id);
+        const checked = items.filter((i) => i.is_checked);
         return (
-          <Card key={l.id} title={`${l.icon} ${l.name}`} action={items.some((i) => i.is_checked) && <button className="btn btn--ghost btn--sm" onClick={async () => { await repo.shopping.clearChecked(l.id); bump(); }}>{t('family.clearChecked')}</button>}>
+          <Card key={l.id} title={`${l.icon} ${l.name}`} action={checked.length > 0 && <button className="btn btn--ghost btn--sm" onClick={async () => { await repo.shopping.clearChecked(l.id); bump(); }}>{t('family.clearChecked')}</button>}>
             {items.map((i) => (
               <Row key={i.id} icon={<input type="checkbox" checked={i.is_checked} onChange={async () => { await repo.shopping.toggleItem(i.id); bump(); }} style={{ width: 22, height: 22 }} />} title={i.name} done={i.is_checked} sub={memberById(i.added_by_member_id)?.display_name} />
             ))}
             <div className="spacer" />
             <ShoppingForm listId={l.id} />
+            {checked.length > 0 && (
+              <>
+                <div className="spacer" />
+                <button className="btn btn--outline btn--block" onClick={() => setToExpense({ list: l, items: checked })}>
+                  🧾 {t('family.toExpense', checked.length)}
+                </button>
+              </>
+            )}
           </Card>
         );
       })}
 
-      {sheet === 'member' && <Sheet onClose={() => setSheet(null)} title={t('family.addMember')}><MemberForm t={t} onDone={() => setSheet(null)} /></Sheet>}
+      {sheet === 'member' && (
+        <Sheet onClose={() => { setSheet(null); setEditing(null); }} title={editing ? t('family.editMember') : t('family.addMember')}>
+          <MemberForm t={t} member={editing} isSelf={Boolean(editing && me && editing.id === me.id)}
+                      onDone={() => { setSheet(null); setEditing(null); }} />
+        </Sheet>
+      )}
+      {toExpense && (
+        <Sheet onClose={() => setToExpense(null)} title={t('family.toExpense', toExpense.items.length)}>
+          <div className="faint" style={{ marginBottom: 'var(--sp-3)' }}>
+            {toExpense.items.map((i) => i.name).join(', ')}
+          </div>
+          <ExpenseForm
+            preset={{ merchant: toExpense.list.name, categoryId: guessGroceryCategory(categories) }}
+            onDone={async () => {
+              // Harcama kaydedildi; işaretli kalemler listeden temizlenir.
+              await repo.shopping.clearChecked(toExpense.list.id);
+              setToExpense(null); bump();
+            }} />
+        </Sheet>
+      )}
       {sheet === 'occasion' && <Sheet onClose={() => setSheet(null)} title={t('family.addOccasion')}><OccasionForm t={t} onDone={() => setSheet(null)} /></Sheet>}
       {sheet === 'document' && <Sheet onClose={() => setSheet(null)} title={t('family.addDocument')}><DocumentForm t={t} onDone={() => setSheet(null)} /></Sheet>}
     </>
   );
 }
 
-function MemberForm({ t, onDone }) {
+/**
+ * Üye ekleme ve düzenleme aynı form.
+ * `member` verilirse düzenleme kipi: kaydet günceller, ayrıca "Haneden çıkar" çıkar.
+ * Çıkarma kalıcı silme değil (`is_active: false`) — eski harcama ve olaylar korunur.
+ */
+function MemberForm({ t, member, isSelf, onDone }) {
   const { repo, reload } = useApp();
-  const [f, setF] = useState({ display_name: '', role: 'child', birthdate: '', avatar_emoji: '🧒', color: '#E9A23B' });
+  const [f, setF] = useState(member
+    ? { display_name: member.display_name || '', role: member.role || 'adult', birthdate: member.birthdate || '', avatar_emoji: member.avatar_emoji || '🙂', color: member.color || '#4F7CAC' }
+    : { display_name: '', role: 'child', birthdate: '', avatar_emoji: '🧒', color: '#E9A23B' });
+  const [busy, setBusy] = useState(false);
+  const [confirming, setConfirming] = useState(false);   // iki adımlı çıkarma
+  const [err, setErr] = useState('');
   const up = (k) => (e) => setF({ ...f, [k]: e.target.value });
-  const submit = async (e) => { e.preventDefault(); if (!f.display_name.trim()) return; await repo.members.create({ ...f, birthdate: f.birthdate || null }); await reload(); onDone(); };
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!f.display_name.trim() || busy) return;
+    setBusy(true);
+    try {
+      const patch = { ...f, display_name: f.display_name.trim(), birthdate: f.birthdate || null };
+      if (member) await repo.members.update(member.id, patch);
+      else await repo.members.create(patch);
+      await reload();
+      onDone();
+    } finally { setBusy(false); }
+  };
+
+  // Tarayıcının confirm() kutusu yerine kart içinde iki adım: telefonda
+  // sistem uyarısı kaba duruyor ve iOS'ta sayfayı dondurabiliyor.
+  const remove = async () => {
+    if (busy) return;
+    setBusy(true); setErr('');
+    try { await repo.members.update(member.id, { is_active: false }); await reload(); onDone(); }
+    catch (ex) { setErr(ex?.message || t('auth.errGeneric')); setConfirming(false); }
+    finally { setBusy(false); }
+  };
+
   return (
     <form onSubmit={submit}>
       <Field label={t('family.memberName')}><input className="input" autoFocus value={f.display_name} onChange={up('display_name')} /></Field>
@@ -129,7 +208,34 @@ function MemberForm({ t, onDone }) {
         <input className="input" type="date" value={f.birthdate} onChange={up('birthdate')} />
         <span className="faint">{t('family.birthdateHint')}</span>
       </Field>
-      <button className="btn btn--block">{t('common.save')}</button>
+      <button className="btn btn--block" disabled={busy}>{t('common.save')}</button>
+      {err && <div className="banner" style={{ color: 'var(--color-danger)' }}>{err}</div>}
+      {member && (
+        <>
+          <div className="spacer" />
+          {isSelf ? (
+            <div className="faint">{t('family.cannotRemoveSelf')}</div>
+          ) : confirming ? (
+            <>
+              <div className="faint" style={{ marginBottom: 'var(--sp-2)' }}>
+                {t('family.removeMemberConfirm', member.display_name)}
+              </div>
+              <div className="grid-2">
+                <button type="button" className="btn btn--ghost" disabled={busy} onClick={() => setConfirming(false)}>
+                  {t('common.cancel')}
+                </button>
+                <button type="button" className="btn btn--danger" disabled={busy} onClick={remove}>
+                  {busy ? t('common.loading') : t('family.removeConfirmYes')}
+                </button>
+              </div>
+            </>
+          ) : (
+            <button type="button" className="btn btn--danger btn--block" disabled={busy} onClick={() => setConfirming(true)}>
+              {t('family.removeMember')}
+            </button>
+          )}
+        </>
+      )}
     </form>
   );
 }

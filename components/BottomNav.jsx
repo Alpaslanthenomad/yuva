@@ -2,13 +2,14 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useT } from '../lib/i18n/context.jsx';
+import Icon from './icons.jsx';
 
 const ITEMS = [
-  { href: '/', icon: '🏡', key: 'today' },
-  { href: '/takvim/', icon: '📅', key: 'calendar' },
-  { href: '/para/', icon: '💰', key: 'money' },
-  { href: '/planlar/', icon: '🧭', key: 'plans' },
-  { href: '/aile/', icon: '👨‍👩‍👧‍👦', key: 'family' },
+  { href: '/', key: 'today' },
+  { href: '/takvim/', key: 'calendar' },
+  { href: '/para/', key: 'money' },
+  { href: '/planlar/', key: 'plans' },
+  { href: '/aile/', key: 'family' },
 ];
 
 export default function BottomNav() {
@@ -20,7 +21,7 @@ export default function BottomNav() {
       <Link href="/" className="nav__brand">{t('app.name')}</Link>
       {ITEMS.map((it) => (
         <Link key={it.key} href={it.href} className={'nav__item' + (isActive(it.href) ? ' nav__item--active' : '')}>
-          <span className="nav__icon" aria-hidden>{it.icon}</span>
+          <span className="nav__icon"><Icon name={it.key} /></span>
           <span>{t('nav.' + it.key)}</span>
         </Link>
       ))}

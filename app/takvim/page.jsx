@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../../components/AppShell.jsx';
 import { Card, Seg, Chips, Avatars, Empty, Sheet, Row } from '../../components/ui.jsx';
-import { EventForm } from '../../components/QuickAdd.jsx';
+import { EventForm, repeatKeyOf } from '../../components/QuickAdd.jsx';
 import { useT } from '../../lib/i18n/context.jsx';
 import { today, weekDays, monthGrid, addDays, addMonths, periodOf, fmtPeriod, fmtDayLong, fmtTime, dowNames, fromISODate, overlaps } from '../../lib/dates.js';
 import { holidayMap } from '../../lib/holidays.js';
@@ -16,6 +16,8 @@ export default function CalendarPage() {
   const [events, setEvents] = useState([]);
   const [adding, setAdding] = useState(false);
   const [open, setOpen] = useState(null);
+  const [editing, setEditing] = useState(false);      // açık olay düzenleme kipinde mi
+  const [confirming, setConfirming] = useState(false); // silme onayı bekliyor mu
   const T = today();
 
   useEffect(() => { try { const d = new URLSearchParams(window.location.search).get('d'); if (d) setSel(d); } catch { /* */ } }, []);
@@ -113,14 +115,33 @@ export default function CalendarPage() {
 
       {adding && <Sheet onClose={() => setAdding(false)} title={t('calendar.newEvent')}><EventForm date0={sel} onDone={() => setAdding(false)} /></Sheet>}
       {open && (
-        <Sheet onClose={() => setOpen(null)} title={open.title}>
-          <Row icon="🕒" title={open.all_day ? t('calendar.allDay') : `${fmtTime(open.starts_at)} – ${fmtTime(open.ends_at)}`} sub={fmtDayLong(open.date)} />
-          <Row icon="🏷️" title={t('calendar.categories.' + open.category)} sub={open.rrule ? `${t('calendar.repeat')}: ${open.rrule}` : null} />
-          {open.location && <Row icon="📍" title={open.location} />}
-          <Row icon="👥" title={<Avatars members={(open.attendees || []).map(memberById).filter(Boolean)} size="md" />} />
-          {open.description && <p className="muted" style={{ padding: 'var(--sp-3) 0' }}>{open.description}</p>}
-          <div className="spacer" />
-          <button className="btn btn--danger btn--block" onClick={async () => { await repo.events.remove(open.id); setOpen(null); bump(); }}>{t('common.delete')}</button>
+        <Sheet onClose={() => { setOpen(null); setEditing(false); setConfirming(false); }} title={editing ? t('calendar.editEvent') : open.title}>
+          {editing ? (
+            <EventForm event={open} onDone={() => { setOpen(null); setEditing(false); }} />
+          ) : (
+            <>
+              <Row icon="🕒" title={open.all_day ? t('calendar.allDay') : `${fmtTime(open.starts_at)} – ${fmtTime(open.ends_at)}`} sub={fmtDayLong(open.date)} />
+              <Row icon="🏷️" title={t('calendar.categories.' + open.category)}
+                   sub={open.rrule ? `${t('calendar.repeat')}: ${t('calendar.repeats.' + repeatKeyOf(open.rrule))}` : null} />
+              {open.location && <Row icon="📍" title={open.location} />}
+              <Row icon="👥" title={<Avatars members={(open.attendees || []).map(memberById).filter(Boolean)} size="md" />} />
+              {open.description && <p className="muted" style={{ padding: 'var(--sp-3) 0' }}>{open.description}</p>}
+              <div className="spacer" />
+              <button className="btn btn--block" onClick={() => setEditing(true)}>{t('common.edit')}</button>
+              <div className="spacer" />
+              {confirming ? (
+                <>
+                  <div className="faint" style={{ marginBottom: 'var(--sp-2)' }}>{t('common.confirmDelete', open.title)}</div>
+                  <div className="grid-2">
+                    <button className="btn btn--ghost" onClick={() => setConfirming(false)}>{t('common.cancel')}</button>
+                    <button className="btn btn--danger" onClick={async () => { await repo.events.remove(open.id); setOpen(null); setConfirming(false); bump(); }}>{t('common.yesDelete')}</button>
+                  </div>
+                </>
+              ) : (
+                <button className="btn btn--danger btn--block" onClick={() => setConfirming(true)}>{t('common.delete')}</button>
+              )}
+            </>
+          )}
         </Sheet>
       )}
     </>

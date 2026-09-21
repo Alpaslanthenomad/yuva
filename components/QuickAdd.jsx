@@ -40,29 +40,37 @@ function useLast() {
   return [last, remember];
 }
 
-export function ExpenseForm({ onDone, planId }) {
+/**
+ * Harcama / gelir / transfer formu.
+ * `txn` verilirse düzenleme kipi: alanlar dolu gelir, kaydet günceller,
+ * altta iki adımlı silme çıkar.
+ */
+export function ExpenseForm({ onDone, planId, txn, preset }) {
   const { repo, accounts, categories, members, me, bump, baseCurrency } = useApp();
   const t = useT();
   const [last, remember] = useLast();
-  const [kind, setKind] = useState('expense');
-  const [amount, setAmount] = useState('');
-  const [currency, setCurrency] = useState(baseCurrency);
-  const [accountId, setAccountId] = useState('');
-  const [toAccountId, setToAccountId] = useState('');
-  const [categoryId, setCategoryId] = useState('');
-  const [merchant, setMerchant] = useState('');
-  const [forMember, setForMember] = useState('');
-  const [date, setDate] = useState(today());
+  const editing = Boolean(txn);
+  const [kind, setKind] = useState(txn?.kind || 'expense');
+  const [amount, setAmount] = useState(txn ? String(txn.amount) : '');
+  const [currency, setCurrency] = useState(txn?.currency || baseCurrency);
+  const [accountId, setAccountId] = useState(txn?.account_id || '');
+  const [toAccountId, setToAccountId] = useState(txn?.transfer_account_id || '');
+  const [categoryId, setCategoryId] = useState(txn?.category_id || preset?.categoryId || '');
+  const [merchant, setMerchant] = useState(txn?.merchant || preset?.merchant || '');
+  const [forMember, setForMember] = useState(txn?.for_member_id || '');
+  const [date, setDate] = useState(txn?.occurred_on || today());
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
+    if (editing) return;   // düzenlemede alanlar işlemden gelir, son kullanılandan değil
     if (!accountId && accounts.length) {
       const a = accounts.find((x) => x.id === last.accountId) || accounts[0];
       setAccountId(a.id); setCurrency(a.currency);
     }
     if (!categoryId && last.categoryId && categories.find((c) => c.id === last.categoryId)) setCategoryId(last.categoryId);
-  }, [accounts, categories, last, accountId, categoryId]);
+  }, [accounts, categories, last, accountId, categoryId, editing]);
 
   const onAccount = (id) => { setAccountId(id); const a = accounts.find((x) => x.id === id); if (a) setCurrency(a.currency); };
   const cats = categories.filter((c) => c.kind === (kind === 'income' ? 'income' : 'expense'));
@@ -76,16 +84,29 @@ export function ExpenseForm({ onDone, planId }) {
     if (kind === 'transfer' && !toAccountId) { setErr(t('money.errToAccount')); return; }
     setBusy(true);
     try {
-      await repo.transactions.create({
+      const row = {
         kind, amount: minorToDecimal(minor, currency), currency, account_id: accountId,
         transfer_account_id: kind === 'transfer' ? toAccountId : null,
         category_id: kind === 'transfer' ? null : categoryId || null, merchant: merchant || null,
-        for_member_id: forMember || null, paid_by_member_id: me?.id, occurred_on: date, plan_id: planId || null,
-      });
-      remember({ accountId, categoryId });
-      bump(); onDone?.(`${merchant || t('money.' + kind)} · ${amount} ${currency}`);
-      setAmount(''); setMerchant('');
+        for_member_id: forMember || null, occurred_on: date,
+      };
+      if (editing) {
+        await repo.transactions.update(txn.id, row);
+        bump(); onDone?.(`${merchant || t('money.' + kind)} · ${amount} ${currency}`);
+      } else {
+        await repo.transactions.create({ ...row, paid_by_member_id: me?.id, plan_id: planId || null });
+        remember({ accountId, categoryId });
+        bump(); onDone?.(`${merchant || t('money.' + kind)} · ${amount} ${currency}`);
+        setAmount(''); setMerchant('');
+      }
     } catch (ex) { setErr(ex.message); } finally { setBusy(false); }
+  };
+
+  const remove = async () => {
+    setBusy(true); setErr('');
+    try { await repo.transactions.remove(txn.id); bump(); onDone?.(null); }
+    catch (ex) { setErr(ex.message); setConfirming(false); }
+    finally { setBusy(false); }
   };
 
   return (
@@ -147,34 +168,70 @@ export function ExpenseForm({ onDone, planId }) {
       </div>
       {err && <div className="banner" style={{ color: 'var(--color-danger)' }}>{err}</div>}
       <button className="btn btn--block" disabled={busy}>{t('common.save')}</button>
+      {editing && (
+        <>
+          <div className="spacer" />
+          {confirming ? (
+            <>
+              <div className="faint" style={{ marginBottom: 'var(--sp-2)' }}>
+                {t('common.confirmDelete', merchant || t('money.' + kind))}
+              </div>
+              <div className="grid-2">
+                <button type="button" className="btn btn--ghost" disabled={busy} onClick={() => setConfirming(false)}>{t('common.cancel')}</button>
+                <button type="button" className="btn btn--danger" disabled={busy} onClick={remove}>{t('common.yesDelete')}</button>
+              </div>
+            </>
+          ) : (
+            <button type="button" className="btn btn--danger btn--block" disabled={busy} onClick={() => setConfirming(true)}>
+              {t('money.deleteTxn')}
+            </button>
+          )}
+        </>
+      )}
     </form>
   );
 }
 
-export function EventForm({ onDone, planId, date0 }) {
+const RR = { none: null, daily: 'FREQ=DAILY', weekly: 'FREQ=WEEKLY', monthly: 'FREQ=MONTHLY', yearly: 'FREQ=YEARLY' };
+/** 'FREQ=WEEKLY' → 'weekly'; bilinmeyen kural 'none' sayılır (düzenlerken bozulmasın diye korunur). */
+export const repeatKeyOf = (rrule) => Object.keys(RR).find((k) => RR[k] === rrule) || 'none';
+const hhmm = (iso) => { const d = new Date(iso); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+
+/**
+ * Olay formu. `event` verilirse düzenleme kipi: alanlar dolu gelir ve
+ * kaydet mevcut olayı günceller.
+ */
+export function EventForm({ onDone, planId, date0, event }) {
   const { repo, members, bump } = useApp();
   const t = useT();
-  const [title, setTitle] = useState('');
-  const [date, setDate] = useState(date0 || today());
-  const [start, setStart] = useState('10:00');
-  const [end, setEnd] = useState('11:00');
-  const [allDay, setAllDay] = useState(false);
-  const [category, setCategory] = useState('other');
-  const [repeat, setRepeat] = useState('none');
-  const [att, setAtt] = useState([]);
-  const [location, setLocation] = useState('');
+  const editing = Boolean(event);
+  const [title, setTitle] = useState(event?.title || '');
+  const [date, setDate] = useState(event?.date || date0 || today());
+  const [start, setStart] = useState(event && !event.all_day ? hhmm(event.starts_at) : '10:00');
+  const [end, setEnd] = useState(event && !event.all_day ? hhmm(event.ends_at) : '11:00');
+  const [allDay, setAllDay] = useState(event?.all_day || false);
+  const [category, setCategory] = useState(event?.category || 'other');
+  const [repeat, setRepeat] = useState(repeatKeyOf(event?.rrule));
+  const [att, setAtt] = useState(event?.attendees || []);
+  const [location, setLocation] = useState(event?.location || '');
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
   const toggle = (id) => setAtt((a) => (a.includes(id) ? a.filter((x) => x !== id) : [...a, id]));
-  const RR = { none: null, daily: 'FREQ=DAILY', weekly: 'FREQ=WEEKLY', monthly: 'FREQ=MONTHLY', yearly: 'FREQ=YEARLY' };
 
   const submit = async (e) => {
-    e.preventDefault(); if (!title.trim()) return; setBusy(true);
+    e.preventDefault(); if (!title.trim()) return; setBusy(true); setErr('');
     try {
       const s = new Date(`${date}T${allDay ? '00:00' : start}:00`).toISOString();
       const en = new Date(`${date}T${allDay ? '23:59' : end}:00`).toISOString();
-      await repo.events.create({ title: title.trim(), starts_at: s, ends_at: en, all_day: allDay, category, rrule: RR[repeat], attendees: att, location: location || null, plan_id: planId || null });
-      bump(); onDone?.(title); setTitle('');
-    } finally { setBusy(false); }
+      const row = { title: title.trim(), starts_at: s, ends_at: en, all_day: allDay, category, rrule: RR[repeat], location: location || null };
+      if (editing) {
+        await repo.events.update(event.id, row);
+        bump(); onDone?.(title);
+      } else {
+        await repo.events.create({ ...row, attendees: att, plan_id: planId || null });
+        bump(); onDone?.(title); setTitle('');
+      }
+    } catch (ex) { setErr(ex.message); } finally { setBusy(false); }
   };
   return (
     <form onSubmit={submit}>
@@ -194,13 +251,15 @@ export function EventForm({ onDone, planId, date0 }) {
           <Field label={t('calendar.end')}><input className="input" type="time" value={end} onChange={(e) => setEnd(e.target.value)} /></Field>
         </div>
       )}
-      <Field label={t('calendar.attendees')}>
-        <div className="chips">
-          {members.map((m) => (
-            <button type="button" key={m.id} className={'chip' + (att.includes(m.id) ? ' chip--active' : '')} onClick={() => toggle(m.id)}>{m.avatar_emoji} {m.display_name}</button>
-          ))}
-        </div>
-      </Field>
+      {!editing && (
+        <Field label={t('calendar.attendees')}>
+          <div className="chips">
+            {members.map((m) => (
+              <button type="button" key={m.id} className={'chip' + (att.includes(m.id) ? ' chip--active' : '')} onClick={() => toggle(m.id)}>{m.avatar_emoji} {m.display_name}</button>
+            ))}
+          </div>
+        </Field>
+      )}
       <div className="grid-2">
         <Field label={t('calendar.repeat')}>
           <select className="select" value={repeat} onChange={(e) => setRepeat(e.target.value)}>
@@ -209,6 +268,7 @@ export function EventForm({ onDone, planId, date0 }) {
         </Field>
         <Field label={t('calendar.location')}><input className="input" value={location} onChange={(e) => setLocation(e.target.value)} /></Field>
       </div>
+      {err && <div className="banner" style={{ color: 'var(--color-danger)' }}>{err}</div>}
       <button className="btn btn--block" disabled={busy}>{t('common.save')}</button>
     </form>
   );
