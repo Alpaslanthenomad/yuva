@@ -101,7 +101,7 @@ create table if not exists public.households (
   name text not null,
   base_currency char(3) not null default 'CLP',
   timezone text not null default 'America/Santiago',
-  locale text not null default 'tr-TR',
+  locale text not null default 'tr',
   week_starts_on smallint not null default 1, -- 1 = Pazartesi
   holiday_countries text[] not null default array['CL','TR'],
   join_code text not null unique default upper(substr(encode(gen_random_bytes(6),'hex'),1,8)),
@@ -424,7 +424,11 @@ create index if not exists occ_household_idx on public.occasions(household_id, m
 -- Üyeye doğum tarihi girilince otomatik doğum günü kaydı
 create or replace function public.sync_member_birthday()
 returns trigger language plpgsql security definer set search_path = public as $$
+declare suffix text;
 begin
+  -- Başlık hanenin diline göre: "Deniz doğum günü" / "Deniz - cumpleaños"
+  select case when left(coalesce(h.locale,'tr'),2) = 'es' then ' - cumpleaños' else ' doğum günü' end
+    into suffix from public.households h where h.id = new.household_id;
   if new.birthdate is null then
     delete from public.occasions where member_id = new.id and kind = 'birthday';
     return new;
@@ -432,11 +436,11 @@ begin
   if exists (select 1 from public.occasions where member_id = new.id and kind='birthday') then
     update public.occasions
       set month = extract(month from new.birthdate), day = extract(day from new.birthdate),
-          year = extract(year from new.birthdate), title = new.display_name || ' doğum günü'
+          year = extract(year from new.birthdate), title = new.display_name || suffix
       where member_id = new.id and kind='birthday';
   else
     insert into public.occasions (household_id, title, kind, month, day, year, member_id)
-    values (new.household_id, new.display_name || ' doğum günü', 'birthday',
+    values (new.household_id, new.display_name || suffix, 'birthday',
             extract(month from new.birthdate), extract(day from new.birthdate),
             extract(year from new.birthdate), new.id);
   end if;
@@ -837,21 +841,25 @@ end $$;
 create or replace function public.budget_status(hid uuid, p_period char(7))
 returns table (category_id uuid, category_name text, icon text, budget numeric, spent numeric, remaining numeric, pct numeric)
 language sql stable security definer set search_path = public as $$
-  with d as (select to_date(p_period||'-01','YYYY-MM-DD') d1),
-  spent as (
+  -- NOT: `from transactions t, d left join ...` yazılmaz — virgüllü birleştirmede
+  -- sonraki LEFT JOIN `t`'ye değil `d`'ye bağlanır ve sorgu derlenmez.
+  -- Bu yüzden dönem sınırları CTE yerine doğrudan ifade olarak yazılıyor.
+  -- CTE adı `sp`: çıktı kolonu `spent` ile çakışmasın (RETURNS TABLE adları görünür).
+  with sp as (
     select coalesce(pc.id, cc.id) cid, sum(t.amount_base) total
-      from public.transactions t, d
+      from public.transactions t
       left join public.categories cc on cc.id = t.category_id
       left join public.categories pc on pc.id = cc.parent_id
      where t.household_id = hid and t.kind='expense'
-       and t.occurred_on >= d.d1 and t.occurred_on < (d.d1 + interval '1 month')
+       and t.occurred_on >= to_date(p_period||'-01','YYYY-MM-DD')
+       and t.occurred_on <  to_date(p_period||'-01','YYYY-MM-DD') + interval '1 month'
      group by 1)
   select b.category_id, c.name, c.icon, b.amount_base,
          coalesce(s.total,0), b.amount_base - coalesce(s.total,0),
          case when b.amount_base > 0 then round(100*coalesce(s.total,0)/b.amount_base,1) else 0 end
     from public.budgets b
     left join public.categories c on c.id = b.category_id
-    left join spent s on s.cid = b.category_id
+    left join sp s on s.cid = b.category_id
    where b.household_id = hid and b.period = p_period
      and public.is_household_member(hid)
    order by 7 desc;
@@ -912,7 +920,11 @@ begin
 end $$;
 
 -- Hesap bakiyeleri (view)
-create or replace view public.account_balances as
+-- security_invoker: view, sorguyu ÇAĞIRAN kullanıcının yetkisiyle çalışır; böylece
+-- accounts/transactions üzerindeki RLS geçerli kalır. Olmazsa view sahibinin
+-- yetkisiyle çalışır ve her hanenin bakiyesi giriş yapmış herkese görünür.
+create or replace view public.account_balances
+with (security_invoker = true) as
 select a.id as account_id, a.household_id, a.name, a.type, a.currency, a.icon,
        a.opening_balance
        + coalesce(sum(case when t.kind='income' and t.account_id=a.id then t.amount
