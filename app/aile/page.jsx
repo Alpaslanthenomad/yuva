@@ -1,0 +1,184 @@
+'use client';
+import { useEffect, useState } from 'react';
+import { useApp } from '../../components/AppShell.jsx';
+import { Card, Row, Chips, Empty, Sheet, Field, Avatar } from '../../components/ui.jsx';
+import { TaskForm, ShoppingForm } from '../../components/QuickAdd.jsx';
+import { useT } from '../../lib/i18n/context.jsx';
+import { today, fmtDay, relativeLabel, weekDays } from '../../lib/dates.js';
+
+const TABS = ['members', 'occasions', 'documents', 'tasks', 'shopping'];
+const DOC_ICON = { passport: '🛂', id: '🪪', license: '🚗', visa: '🛃', insurance: '🛡️', contract: '📄', vehicle: '🔧', other: '📎' };
+
+export default function FamilyPage() {
+  const { repo, members, household, memberById, tick, bump } = useApp();
+  const t = useT();
+  const [tab, setTab] = useState('members');
+  const [d, setD] = useState(null);
+  const [sheet, setSheet] = useState(null);
+
+  useEffect(() => { try { const x = new URLSearchParams(window.location.search).get('tab'); if (x && TABS.includes(x)) setTab(x); } catch { /* */ } }, []);
+  useEffect(() => {
+    if (!household) return;
+    Promise.all([repo.occasions.list(), repo.documents.list(), repo.tasks.list(), repo.shopping.lists(), repo.shopping.items()])
+      .then(([occasions, documents, tasks, lists, items]) => setD({ occasions, documents, tasks, lists, items }));
+  }, [repo, household, tick]);
+
+  if (!d) return <Empty>{t('common.loading')}</Empty>;
+  const T = today();
+  const wk = weekDays(T);
+
+  return (
+    <>
+      <div className="page-head"><h1 className="h1">{t('family.title')}</h1><span className="faint">{household.name}</span></div>
+      <Chips value={tab} onChange={setTab} options={TABS.map((k) => ({ value: k, label: t('family.' + k) }))} />
+      <div className="spacer" />
+
+      {tab === 'members' && (
+        <>
+          <Card>
+            {members.map((m) => {
+              const pts = d.tasks.filter((k) => k.assignee_member_id === m.id && k.is_done && k.done_at && k.done_at.slice(0, 10) >= wk[0]).reduce((s, k) => s + (k.points || 0), 0);
+              return (
+                <Row key={m.id} icon={<Avatar member={m} />} title={m.display_name} sub={`${t('family.roles.' + m.role)}${m.birthdate ? ' · ' + fmtDay(m.birthdate) + ' ' + m.birthdate.slice(0, 4) : ''}`}
+                  end={m.role === 'child' ? <span className="tag tag--ok">⭐ {pts} {t('family.weeklyStars')}</span> : null} />
+              );
+            })}
+          </Card>
+          <button className="btn btn--outline btn--block" onClick={() => setSheet('member')}>+ {t('family.addMember')}</button>
+          <div className="spacer" />
+          <div className="faint">{t('settings.joinCode')}: <span className="mono">{household.join_code}</span> — {t('family.childrenNoAccount')}</div>
+        </>
+      )}
+
+      {tab === 'occasions' && (
+        <>
+          <Card>
+            {d.occasions.map((o) => (
+              <Row key={o.id} icon={o.kind === 'birthday' ? '🎂' : o.kind === 'anniversary' ? '💍' : o.kind === 'memorial' ? '🕯️' : '📌'} title={o.title}
+                sub={`${fmtDay(o.date)} · ${relativeLabel(o.date)}${o.year && o.kind === 'birthday' ? ' · ' + t('family.turns', Number(o.date.slice(0, 4)) - o.year) : ''}${o.gift_ideas ? ' · 🎁 ' + o.gift_ideas : ''}`}
+                end={<span className={'tag' + (o.daysLeft <= o.remind_days ? ' tag--warn' : '')}>{t('family.daysShort', o.daysLeft)}</span>} />
+            ))}
+            {d.occasions.length === 0 && <Empty>{t('common.empty')}</Empty>}
+          </Card>
+          <button className="btn btn--outline btn--block" onClick={() => setSheet('occasion')}>+ {t('family.addOccasion')}</button>
+        </>
+      )}
+
+      {tab === 'documents' && (
+        <>
+          <Card>
+            {d.documents.map((x) => (
+              <Row key={x.id} icon={DOC_ICON[x.kind]} title={x.title}
+                sub={`${t('family.docKinds.' + x.kind)}${x.member_id ? ' · ' + memberById(x.member_id)?.display_name : ''}${x.number_hint ? ' · ' + x.number_hint : ''}`}
+                end={x.expires_on ? <span className={'tag ' + (x.daysLeft < 0 ? 'tag--danger' : x.daysLeft <= x.remind_days ? 'tag--warn' : '')}>{x.daysLeft < 0 ? t('family.expired') : fmtDay(x.expires_on) + ' ' + x.expires_on.slice(0, 4)}</span> : null} />
+            ))}
+            {d.documents.length === 0 && <Empty>{t('common.empty')}</Empty>}
+          </Card>
+          <button className="btn btn--outline btn--block" onClick={() => setSheet('document')}>+ {t('family.addDocument')}</button>
+        </>
+      )}
+
+      {tab === 'tasks' && (
+        <>
+          <Card>
+            {d.tasks.map((k) => (
+              <Row key={k.id} icon={<input type="checkbox" checked={k.is_done} onChange={async () => { await repo.tasks.toggle(k.id); bump(); }} style={{ width: 22, height: 22 }} />}
+                title={k.title} done={k.is_done} sub={[memberById(k.assignee_member_id)?.display_name, k.due_on && relativeLabel(k.due_on), k.rrule && '↻', k.plan_id && '🧭'].filter(Boolean).join(' · ')}
+                end={k.points ? <span className="tag tag--ok">⭐ {k.points}</span> : null} />
+            ))}
+            {d.tasks.length === 0 && <Empty>{t('common.empty')}</Empty>}
+          </Card>
+          <Card title={t('family.addTask')}><TaskForm /></Card>
+        </>
+      )}
+
+      {tab === 'shopping' && d.lists.map((l) => {
+        const items = d.items.filter((i) => i.list_id === l.id);
+        return (
+          <Card key={l.id} title={`${l.icon} ${l.name}`} action={items.some((i) => i.is_checked) && <button className="btn btn--ghost btn--sm" onClick={async () => { await repo.shopping.clearChecked(l.id); bump(); }}>{t('family.clearChecked')}</button>}>
+            {items.map((i) => (
+              <Row key={i.id} icon={<input type="checkbox" checked={i.is_checked} onChange={async () => { await repo.shopping.toggleItem(i.id); bump(); }} style={{ width: 22, height: 22 }} />} title={i.name} done={i.is_checked} sub={memberById(i.added_by_member_id)?.display_name} />
+            ))}
+            <div className="spacer" />
+            <ShoppingForm listId={l.id} />
+          </Card>
+        );
+      })}
+
+      {sheet === 'member' && <Sheet onClose={() => setSheet(null)} title={t('family.addMember')}><MemberForm t={t} onDone={() => setSheet(null)} /></Sheet>}
+      {sheet === 'occasion' && <Sheet onClose={() => setSheet(null)} title={t('family.addOccasion')}><OccasionForm t={t} onDone={() => setSheet(null)} /></Sheet>}
+      {sheet === 'document' && <Sheet onClose={() => setSheet(null)} title={t('family.addDocument')}><DocumentForm t={t} onDone={() => setSheet(null)} /></Sheet>}
+    </>
+  );
+}
+
+function MemberForm({ t, onDone }) {
+  const { repo, reload } = useApp();
+  const [f, setF] = useState({ display_name: '', role: 'child', birthdate: '', avatar_emoji: '🧒', color: '#E9A23B' });
+  const up = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  const submit = async (e) => { e.preventDefault(); if (!f.display_name.trim()) return; await repo.members.create({ ...f, birthdate: f.birthdate || null }); await reload(); onDone(); };
+  return (
+    <form onSubmit={submit}>
+      <Field label={t('family.memberName')}><input className="input" autoFocus value={f.display_name} onChange={up('display_name')} /></Field>
+      <div className="grid-3">
+        <Field label={t('family.role')}><select className="select" value={f.role} onChange={up('role')}>{['adult', 'child', 'guest'].map((r) => <option key={r} value={r}>{t('family.roles.' + r)}</option>)}</select></Field>
+        <Field label={t('family.emoji')}><input className="input" value={f.avatar_emoji} onChange={up('avatar_emoji')} /></Field>
+        <Field label={t('family.color')}><input className="input" type="color" value={f.color} onChange={up('color')} /></Field>
+      </div>
+      <Field label={t('family.birthdate')}>
+        <input className="input" type="date" value={f.birthdate} onChange={up('birthdate')} />
+        <span className="faint">{t('family.birthdateHint')}</span>
+      </Field>
+      <button className="btn btn--block">{t('common.save')}</button>
+    </form>
+  );
+}
+
+function OccasionForm({ t, onDone }) {
+  const { repo, bump, members } = useApp();
+  const [f, setF] = useState({ title: '', kind: 'custom', date: '', member_id: '', gift_ideas: '', remind_days: 7 });
+  const up = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  const submit = async (e) => {
+    e.preventDefault(); if (!f.title.trim() || !f.date) return;
+    const [y, m, dd] = f.date.split('-').map(Number);
+    await repo.occasions.create({ title: f.title.trim(), kind: f.kind, month: m, day: dd, year: y > 1900 ? y : null, member_id: f.member_id || null, gift_ideas: f.gift_ideas || null, remind_days: Number(f.remind_days) });
+    bump(); onDone();
+  };
+  return (
+    <form onSubmit={submit}>
+      <Field label={t('calendar.titleField')}><input className="input" autoFocus value={f.title} onChange={up('title')} /></Field>
+      <div className="grid-2">
+        <Field label={t('family.occasionKind')}><select className="select" value={f.kind} onChange={up('kind')}>{['birthday', 'anniversary', 'memorial', 'custom'].map((k) => <option key={k} value={k}>{t('family.kinds.' + k)}</option>)}</select></Field>
+        <Field label={t('family.firstYear')}><input className="input" type="date" value={f.date} onChange={up('date')} /></Field>
+      </div>
+      <div className="grid-2">
+        <Field label={t('family.member')}><select className="select" value={f.member_id} onChange={up('member_id')}><option value="">—</option>{members.map((m) => <option key={m.id} value={m.id}>{m.display_name}</option>)}</select></Field>
+        <Field label={t('family.remindDays')}><input className="input" type="number" value={f.remind_days} onChange={up('remind_days')} /></Field>
+      </div>
+      <Field label={`🎁 ${t('family.giftIdeas')}`}><input className="input" value={f.gift_ideas} onChange={up('gift_ideas')} /></Field>
+      <button className="btn btn--block">{t('common.save')}</button>
+    </form>
+  );
+}
+
+function DocumentForm({ t, onDone }) {
+  const { repo, bump, members } = useApp();
+  const [f, setF] = useState({ title: '', kind: 'passport', member_id: '', expires_on: '', remind_days: 90, number_hint: '' });
+  const up = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  const submit = async (e) => { e.preventDefault(); if (!f.title.trim()) return; await repo.documents.create({ ...f, member_id: f.member_id || null, expires_on: f.expires_on || null, remind_days: Number(f.remind_days) }); bump(); onDone(); };
+  return (
+    <form onSubmit={submit}>
+      <Field label={t('calendar.titleField')}><input className="input" autoFocus value={f.title} onChange={up('title')} /></Field>
+      <div className="grid-2">
+        <Field label={t('family.occasionKind')}><select className="select" value={f.kind} onChange={up('kind')}>{Object.entries(t('family.docKinds')).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Field>
+        <Field label={t('family.member')}><select className="select" value={f.member_id} onChange={up('member_id')}><option value="">—</option>{members.map((m) => <option key={m.id} value={m.id}>{m.display_name}</option>)}</select></Field>
+      </div>
+      <div className="grid-2">
+        <Field label={t('family.expires')}><input className="input" type="date" value={f.expires_on} onChange={up('expires_on')} /></Field>
+        <Field label={t('family.remindDays')}><input className="input" type="number" value={f.remind_days} onChange={up('remind_days')} /></Field>
+      </div>
+      <Field label={t('family.numberHint')}><input className="input" maxLength={8} value={f.number_hint} onChange={up('number_hint')} placeholder="…4471" /></Field>
+      <button className="btn btn--block">{t('common.save')}</button>
+    </form>
+  );
+}

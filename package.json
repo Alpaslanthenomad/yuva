@@ -1,0 +1,22 @@
+{
+  "name": "yuva",
+  "version": "0.1.0",
+  "private": true,
+  "description": "YUVA — Aile Yönetim Sistemi: ortak takvim, ev muhasebesi, planlama. Telefon önce PWA.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "serve": "npx serve out -l 3000",
+    "test": "node --test tests/*.test.js",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.116.0",
+    "next": "^16.3.5",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
