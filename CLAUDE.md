@@ -68,9 +68,22 @@ npm run serve      # out/ klasörünü yerelde sun (PWA testi için)
 - Bileşenler PascalCase: `components/MoneyRow.jsx`.
 - CSS sınıfları `blok__eleman--durum`.
 
+## Giriş (auth)
+
+E-posta + şifre. **Sihirli bağlantı (magic link) kullanılmaz** — 2026-09-21'de
+kaldırıldı. Gerekçe: iki kişilik bir hanede her girişte e-posta beklemek,
+bağlantıya tıklamak ve Supabase'de Site URL ayarlamak gereksiz sürtünmeydi;
+üstelik ücretsiz planın e-posta kotası (saatte 2) denemelerde tükeniyordu.
+Şifre Windows, Mac ve telefonda aynı çalışır, tarayıcı kaydeder.
+
+Supabase'de **Authentication › Sign In / Providers › Email › "Confirm email"
+KAPALI olmalı.** Açık kalırsa `signUp` oturum döndürmez ve uygulama
+`auth.errNeedsConfirm` hatasını gösterir. Şifre değiştirme: Ayarlar › 🔑 Şifre.
+
 ## Yapılmayacaklar
 
 - Backend'i "geçici olarak" frontend'de yazmak.
 - Çocuk profillerine e-posta/şifre alanı eklemek.
+- Girişe e-posta bağlantısı / OTP geri getirmek (yukarıdaki gerekçeye bak).
 - Tıbbi içerik (tanı, ilaç) saklamak — yalnızca randevu tarihi.
 - Demo veriyi gerçek Supabase'e seed etmek.

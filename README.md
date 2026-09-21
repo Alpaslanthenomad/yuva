@@ -29,11 +29,25 @@ npm run build        # statik export → out/
 Telefonda denemek için: `npm run build && npm run serve`, ardından aynı Wi-Fi'daki
 telefondan `http://<bilgisayar-ip>:3000` → "Ana ekrana ekle".
 
-## Supabase'e bağlama (Faz 1)
+## Canlı kurulum
 
-1. Supabase'de proje aç → SQL Editor'da sırayla: `supabase/migrations/0001_init.sql`, `supabase/migrations/0002_i18n.sql`, sonra `supabase/seed.sql`.
-2. `.env.example` → `.env` ; URL ve anon key'i yaz.
-3. `npm run build` → Vercel/Netlify/Cloudflare Pages'e `out/` klasörünü at.
+| | |
+|---|---|
+| Uygulama | https://yuva-sage.vercel.app (Vercel, `main` dalından otomatik) |
+| Veritabanı | Supabase projesi `yuva`, bölge `sa-east-1` (São Paulo — Şili'ye en yakın) |
+| Migration durumu | 0001a, 0001b, 0002, 0003 uygulandı; `fx_rates` tohumlandı |
+
+### Yeni bir ortama kurmak için
+
+1. Supabase'de proje aç → SQL Editor'da sırayla çalıştır:
+   `migrations/0001_init.sql` → `migrations/0002_i18n.sql` → `migrations/0003_harden.sql` → `seed.sql`.
+   **0003 atlanmamalı** — onsuz `post_due_recurring` gibi RPC'ler giriş yapmamış
+   herkese açık kalır (ayrıntı dosyanın başında).
+2. Supabase → **Authentication → URL Configuration**: `Site URL` uygulamanın adresi
+   olmalı (varsayılan `http://localhost:3000`, bırakılırsa giriş bağlantısı çalışmaz).
+   `Redirect URLs`'e adres + `/**` eklenir.
+3. Vercel → Settings → Environment Variables: `NEXT_PUBLIC_SUPABASE_URL` ve
+   `NEXT_PUBLIC_SUPABASE_ANON_KEY` → Redeploy. (Anon key gizli değildir; koruma RLS'tedir.)
 4. Uygulamada e-posta ile giriş → "Yeni hane kur" → eşine katılım kodunu ver.
 5. (İsteğe bağlı) pg_cron aç; `seed.sql` sonundaki `cron.schedule` satırını çalıştır (vadeli faturalar).
 

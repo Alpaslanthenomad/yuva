@@ -32,8 +32,16 @@ Faz tanımları `PROJECT_BLUEPRINT.md §5`.
 
 ## Faz 1 — MVP (Şimdi)
 
-- [ ] Supabase projesi aç ("Yuva"), migration'ları uygula, env'i Vercel'e koy
-- [ ] Giriş: e-posta magic link; ilk girişte "hane kur / koda katıl" akışı
+- [x] Supabase projesi `yuva` (sa-east-1) açıldı; 0001a/0001b/0002/0003 uygulandı; kurlar tohumlandı — 2026-09-21
+- [x] `account_balances` view'i `security_invoker` yapıldı (RLS'i atlıyordu) — 2026-09-21
+- [x] `budget_status` içindeki hatalı virgüllü JOIN düzeltildi (derlenmiyordu) — 2026-09-21
+- [x] Migration 0003: RPC yetkileri sertleştirildi; `post_due_recurring` anon'a kapatıldı — 2026-09-21
+- [ ] Vercel env değişkenleri + Supabase Auth Site URL (kullanıcı tarafında, panelden)
+- [ ] İlk gerçek hane kurulumu ve eşin katılım kodu ile girişi
+- [x] Giriş **e-posta + şifreye** çevrildi; magic link kaldırıldı — 2026-09-21
+- [x] Ayarlar › Şifre değiştirme — 2026-09-21
+- [x] İlk hane kuruldu ("Bizim Ev", CLP, TR); 52 kategori tohumlandı — 2026-09-21
+- [ ] Supabase: "Confirm email" kapatılsın (eşin hesap açabilmesi için)
 - [ ] `supabaseRepo` tüm contract metodlarını gerçek sorgularla doldur (şu an iskelet)
 - [ ] Takvim: hafta görünümü sürükle-kaydır; RRULE düzenleme UI; çakışma uyarısı
 - [ ] Para: işlem düzenleme/silme; filtre (ay/üye/kategori/hesap); rapor grafikleri

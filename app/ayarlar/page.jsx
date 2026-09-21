@@ -83,6 +83,8 @@ export default function SettingsPage() {
         <div className="inline">{categories.filter((c) => !c.parent_id).map((c) => <span key={c.id} className="tag">{c.icon} {c.name}</span>)}</div>
       </Card>
 
+      {repo.mode === 'supabase' && <PasswordCard t={t} repo={repo} />}
+
       <Card title={t('settings.data')}>
         <div className="inline">
           <button className="btn btn--outline btn--sm" onClick={() => exportCsv(repo)}>{t('settings.exportCsv')}</button>
@@ -95,6 +97,36 @@ export default function SettingsPage() {
         <p className="faint">{repo.mode === 'supabase' ? t('settings.connectedHint') : t('settings.demoHint')}</p>
       </Card>
     </>
+  );
+}
+
+/** Şifre değiştirme — yalnızca Supabase modunda anlamlı. */
+function PasswordCard({ t, repo }) {
+  const [pw, setPw] = useState('');
+  const [msg, setMsg] = useState('');
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const submit = async (e) => {
+    e.preventDefault(); setMsg(''); setErr('');
+    if (pw.length < 6) { setErr(t('auth.errShort')); return; }
+    setBusy(true);
+    try {
+      await repo.auth.changePassword(pw);
+      setPw(''); setMsg(t('settings.passwordChanged'));
+    } catch (ex) { setErr(ex.message); } finally { setBusy(false); }
+  };
+  return (
+    <Card title={`🔑 ${t('settings.password')}`}>
+      <form onSubmit={submit}>
+        <Field label={t('settings.newPassword')}>
+          <input className="input" type="password" minLength={6} autoComplete="new-password"
+                 value={pw} onChange={(e) => setPw(e.target.value)} />
+        </Field>
+        {msg && <div className="banner" style={{ background: 'var(--color-brand-soft)', color: 'var(--color-brand-ink)' }}>{msg}</div>}
+        {err && <div className="banner" style={{ color: 'var(--color-danger)' }}>{err}</div>}
+        <button className="btn btn--outline" disabled={busy || !pw}>{t('settings.changePassword')}</button>
+      </form>
+    </Card>
   );
 }
 

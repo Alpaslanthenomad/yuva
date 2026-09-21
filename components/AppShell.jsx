@@ -21,13 +21,15 @@ export default function AppShell({ children }) {
   const reload = useCallback(async () => {
     try {
       const base = await repo.init();
-      if (!base.household) { setState((s) => ({ ...s, ...base, loading: false })); return; }
+      if (!base.household) { setState((s) => ({ ...s, ...base, loading: false })); return base; }
       applyHouseholdDefault(base.household.locale);
       const [accounts, categories, rates] = await Promise.all([repo.accounts.list(), repo.categories.list(), repo.fx.rates()]);
       setState({ ...base, accounts, categories, rates, loading: false });
+      return base;   // çağıran (giriş ekranı) haneyi görüp görmediğini bilsin
     } catch (e) {
       console.error(e);
       setState((s) => ({ ...s, loading: false, error: e.message }));
+      return null;
     }
   }, [repo, applyHouseholdDefault]);
 
