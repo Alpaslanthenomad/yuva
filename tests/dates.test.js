@@ -20,6 +20,19 @@ test('expandRRule haftalık BYDAY', () => {
   const r = expandRRule('FREQ=WEEKLY;BYDAY=MO,TH', '2026-09-14', '2026-09-14', '2026-09-27');
   assert.deepEqual(r, ['2026-09-14', '2026-09-17', '2026-09-21', '2026-09-24']);
 });
+test('expandRRule haftalık BYDAY yok — kendi gününde kalır', () => {
+  // 2026-09-23 Çarşamba. Tekrarlar da Çarşamba olmalı, Pazartesi'ye kaymamalı.
+  const r = expandRRule('FREQ=WEEKLY', '2026-09-23', '2026-09-23', '2026-10-20');
+  assert.deepEqual(r, ['2026-09-23', '2026-09-30', '2026-10-07', '2026-10-14']);
+});
+test('expandRRule iki haftada bir — kendi gününde kalır', () => {
+  const r = expandRRule('FREQ=WEEKLY;INTERVAL=2', '2026-09-23', '2026-09-23', '2026-11-01');
+  assert.deepEqual(r, ['2026-09-23', '2026-10-07', '2026-10-21']);
+});
+test('expandRRule haftalık BYDAY + INTERVAL=2', () => {
+  const r = expandRRule('FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,TH', '2026-09-14', '2026-09-14', '2026-10-04');
+  assert.deepEqual(r, ['2026-09-14', '2026-09-17', '2026-09-28', '2026-10-01']);
+});
 test('expandRRule aylık + COUNT + exdate', () => {
   const r = expandRRule('FREQ=MONTHLY;COUNT=3', '2026-01-31', '2026-01-01', '2026-12-31', ['2026-02-28']);
   assert.deepEqual(r, ['2026-01-31', '2026-03-31']);
