@@ -45,6 +45,7 @@ Faz tanımları `PROJECT_BLUEPRINT.md §5`.
 - [x] Tekrarlayan olayda tek günü atlama: migration 0008 (`event_skip_occurrence`), Takvim'de "Yalnızca bu gün" / "Tüm seri" seçimi; canlıya uygulandı — 2026-09-21
 - [x] Cihazlar arası canlı yenileme: migration 0009 (18 tablo yayında, `replica identity full`), `repo.subscribe` + AppShell'de 400 ms'lik toplama; canlıya uygulandı — 2026-09-21
 - [x] Tekrarlayan görevler: migration 0010 (`task_completions` + tamamla/geri al/ertele/atla RPC'leri), `nextOccurrence()` yardımcısı, Aile'de satıra dokununca açılan eylemler, haftalık puan artık tamamlama kaydından; canlıya uygulandı — 2026-09-22
+- [x] Bugün ekranı önceliklendirildi: Bugün / Bekleyen işler / Sıradaki 7 gün sırası; geciken görev ayrı gösteriliyor (kaç gün geciktiğiyle), görev tamamlamada "Geri al", bildirimler tek satıra katlandı, hafta şeridi 7 gün kartına taşındı, para kartı aşağı indi — 2026-09-22
 - [ ] "Kaydedildi / senkron bekliyor" göstergesi (Realtime var, durum çubuğu yok)
 - [ ] Gerçek çevrimdışı veri katmanı (service worker kabuğu var, veri yok)
 

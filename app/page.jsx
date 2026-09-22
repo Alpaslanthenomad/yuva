@@ -5,7 +5,7 @@ import { useApp } from '../components/AppShell.jsx';
 import { Card, Row, Money, Bar, Avatars, Empty } from '../components/ui.jsx';
 import { ShoppingForm } from '../components/QuickAdd.jsx';
 import { useT } from '../lib/i18n/context.jsx';
-import { today, periodOf, fmtDayLong, fmtTime, relativeLabel, weekDays, dowNames, fromISODate, fmtDay, nextOccurrence } from '../lib/dates.js';
+import { today, periodOf, fmtDayLong, fmtTime, relativeLabel, weekDays, dowNames, fromISODate, fmtDay, nextOccurrence, daysBetween } from '../lib/dates.js';
 import { formatMoney, budgetState, dailyAllowance } from '../lib/money.js';
 import { holidayMap } from '../lib/holidays.js';
 
@@ -14,6 +14,10 @@ export default function TodayPage() {
   const { repo, me, members, tick, household, baseCurrency, memberById, bump, locale } = app;
   const t = useT();
   const [data, setData] = useState(null);
+  // Tekrarlayan görev tamamlanınca vadesi ileri gider ve listeden kaybolur —
+  // kullanıcı işaretlediğini teyit edemiyordu. Bu tur için ekranda tutulur.
+  const [justDone, setJustDone] = useState([]);
+  const [notifOpen, setNotifOpen] = useState(false);
   const T = today();
 
   useEffect(() => {
@@ -36,7 +40,12 @@ export default function TodayPage() {
   const bs = total ? budgetState(total.spent, total.budget) : null;
   const holidays = holidayMap(Number(T.slice(0, 4)), household.holiday_countries, locale);
   const openShopping = shopping.filter((s) => !s.is_checked);
-  const todayTasks = agenda.tasks.filter((k) => !k.due_on || k.due_on <= T);
+  // Geciken işi bugünkü işle aynı kutuya koymak, gecikmeyi görünmez yapıyordu.
+  const openTasks = agenda.tasks.filter((k) => !k.is_done);
+  const overdueTasks = openTasks.filter((k) => k.due_on && k.due_on < T);
+  const dueTodayTasks = openTasks.filter((k) => k.due_on === T);
+  const undatedTasks = openTasks.filter((k) => !k.due_on);
+  const todayTasks = [...overdueTasks, ...dueTodayTasks, ...undatedTasks];
   const wd = weekDays(T);
   const DOW = dowNames();
 
@@ -44,7 +53,7 @@ export default function TodayPage() {
   // ne yapılacağını söyleyen tek bir kart göster.
   const upcomingCount = agenda.documents.length + agenda.bills.length + agenda.occasions.length
     + agenda.events.filter((e) => e.date > T).length;
-  const isFirstRun = weekEvents.length === 0 && upcomingCount === 0 && todayTasks.length === 0
+  const isFirstRun = weekEvents.length === 0 && upcomingCount === 0 && openTasks.length === 0
     && openShopping.length === 0 && month.expense === 0 && month.income === 0;
 
   return (
@@ -57,16 +66,55 @@ export default function TodayPage() {
         <Avatars members={members} />
       </div>
 
-      {notifs.length > 0 && (
-        <Card title={`🔔 ${t('common.notifications')}`}>
-          {notifs.map((n) => (
-            <Row key={n.id} wrap title={n.title} sub={n.body} end={<button className="btn btn--ghost btn--sm" onClick={async () => { await repo.notifications.markRead(n.id); bump(); }}>✓</button>} />
-          ))}
-        </Card>
+      {isFirstRun ? <StartCard onQuick={app.openQuick} /> : <>
+
+      {/* BUGÜN — açınca ilk görülen şey: bugün ne var, ne yapılacak. */}
+      <Card title={t('today.todayBlock')}>
+        {todays.map((e) => (
+          <div className="event" key={e.id + e.date}>
+            <div className="event__time">{e.all_day ? t('calendar.allDay') : fmtTime(e.starts_at)}</div>
+            <div className="event__bar" style={{ background: memberById(e.attendees?.[0])?.color || 'var(--color-brand)' }} />
+            <div style={{ flex: 1 }}>
+              <div className="event__title">{e.title}</div>
+              <div className="event__meta">{t('calendar.categories.' + e.category)}{e.location ? ` · ${e.location}` : ''}</div>
+            </div>
+            <Avatars members={(e.attendees || []).map(memberById).filter(Boolean)} />
+          </div>
+        ))}
+        {dueTodayTasks.concat(undatedTasks).map((k) => (
+          <TaskLine key={k.id} task={k} t={t} repo={repo} bump={bump} memberById={memberById}
+            onDone={(id) => setJustDone((x) => [...x, id])} />
+        ))}
+        {justDone.length > 0 && justDone.map((id) => (
+          <Row key={'done-' + id} icon="✓" title={t('today.doneJustNow')} done
+            end={<button className="btn btn--ghost btn--sm" onClick={async () => {
+              await repo.tasks.uncomplete(id);
+              setJustDone((x) => x.filter((y) => y !== id));
+              bump();
+            }}>{t('today.undo')}</button>} />
+        ))}
+        {todays.length === 0 && dueTodayTasks.length === 0 && undatedTasks.length === 0 && justDone.length === 0
+          && <Empty>{t('today.nothingToday')}</Empty>}
+      </Card>
+
+      {/* BEKLEYEN İŞLER — gecikenler en üstte; boşken kart hiç çizilmez. */}
+      {(overdueTasks.length > 0 || agenda.documents.length > 0 || agenda.bills.length > 0) && (
+      <Card title={t('today.pending')} action={<span className="faint">{t('today.pendingCount', overdueTasks.length + agenda.documents.length + agenda.bills.length)}</span>}>
+        {overdueTasks.map((k) => (
+          <TaskLine key={k.id} task={k} t={t} repo={repo} bump={bump} memberById={memberById} overdueFrom={T}
+            onDone={(id) => setJustDone((x) => [...x, id])} />
+        ))}
+        {agenda.documents.map((d) => (
+          <Row key={d.id} icon="🪪" title={d.title} sub={d.daysLeft < 0 ? t('family.expired') : t('family.expiresIn', d.daysLeft)} end={<span className={'tag ' + (d.daysLeft <= 30 ? 'tag--danger' : 'tag--warn')}>{fmtDay(d.expires_on)}</span>} />
+        ))}
+        {agenda.bills.map((b) => (
+          <Row key={b.id} icon="🧾" title={b.name} sub={relativeLabel(b.next_due_on)} end={<Money amount={b.amount} currency={b.currency} kind={b.kind} />} />
+        ))}
+      </Card>
       )}
 
-      {/* Hafta şeridi */}
-      <Card title={t('today.week')} action={<Link className="faint" href="/takvim/">{t('common.seeAll')} →</Link>}>
+      {/* SIRADAKİ 7 GÜN — bugünden sonrası. Belge ve vadeler Bekleyen'e taşındı. */}
+      <Card title={t('today.next7')} action={<Link className="faint" href="/takvim/">{t('common.seeAll')} →</Link>}>
         <div className="week-strip">
           {wd.map((d, i) => {
             const evs = weekEvents.filter((e) => e.date === d);
@@ -80,27 +128,32 @@ export default function TodayPage() {
             );
           })}
         </div>
-      </Card>
-
-      {isFirstRun ? <StartCard onQuick={app.openQuick} /> : <>
-
-      {/* Bugünün ajandası */}
-      <Card title={t('today.agenda')}>
-        {todays.length === 0 ? <Empty>{t('today.noEvents')}</Empty> : todays.map((e) => (
-          <div className="event" key={e.id + e.date}>
-            <div className="event__time">{e.all_day ? t('calendar.allDay') : fmtTime(e.starts_at)}</div>
-            <div className="event__bar" style={{ background: memberById(e.attendees?.[0])?.color || 'var(--color-brand)' }} />
-            <div style={{ flex: 1 }}>
-              <div className="event__title">{e.title}</div>
-              <div className="event__meta">{t('calendar.categories.' + e.category)}{e.location ? ` · ${e.location}` : ''}</div>
-            </div>
-            <Avatars members={(e.attendees || []).map(memberById).filter(Boolean)} />
-          </div>
+        <div className="spacer" />
+        {agenda.events.filter((e) => e.date > T).slice(0, 5).map((e) => (
+          <Row key={e.id + e.date} icon="📅" title={e.title} sub={`${relativeLabel(e.date)} · ${e.all_day ? t('calendar.allDay') : fmtTime(e.starts_at)}`} end={<Avatars members={(e.attendees || []).map(memberById).filter(Boolean)} />} />
+        ))}
+        {agenda.occasions.map((o) => (
+          <Row key={o.id} icon={o.kind === 'birthday' ? '🎂' : '💍'} title={o.title} sub={relativeLabel(o.date) + (o.year && o.kind === 'birthday' ? ` · ${t('family.turns', Number(o.date.slice(0, 4)) - o.year)}` : '')} end={o.gift_ideas ? <span className="tag">🎁</span> : null} />
         ))}
       </Card>
 
-      {/* Para nabzı */}
-      <Card title={t('today.moneyPulse')} action={<Link className="faint" href="/para/">{t('nav.money')} →</Link>} className="card--brand">
+
+      {/* Bildirimler katlı gelir: üç satır halinde tepeyi doldurup günün
+          işlerini ekranın altına itiyordu. Vade ve belge uyarıları zaten
+          bekleyen işler kartında görünüyor. */}
+      {notifs.length > 0 && (
+      <Card>
+        <Row icon="🔔" title={t('today.notifCount', notifs.length)}
+          onClick={() => setNotifOpen((x) => !x)}
+          end={<span className="faint">{notifOpen ? '▲' : '▼'}</span>} />
+        {notifOpen && notifs.map((n) => (
+          <Row key={n.id} wrap title={n.title} sub={n.body}
+            end={<button className="btn btn--ghost btn--sm" onClick={async () => { await repo.notifications.markRead(n.id); bump(); }}>✓</button>} />
+        ))}
+      </Card>
+      )}
+
+            <Card title={t('today.moneyPulse')} action={<Link className="faint" href="/para/">{t('nav.money')} →</Link>} className="card--brand">
         <div className="between" style={{ alignItems: 'flex-end' }}>
           <div>
             <div className="faint">{t('today.spentThisMonth')}</div>
@@ -127,43 +180,12 @@ export default function TodayPage() {
         )}
       </Card>
 
-      {/* Yaklaşanlar — boşken kart hiç çizilmez (üst üste boş kutu görünmesin) */}
-      {upcomingCount > 0 && (
-      <Card title={t('today.upcoming')}>
-        {agenda.documents.map((d) => (
-          <Row key={d.id} icon="🪪" title={d.title} sub={d.daysLeft < 0 ? t('family.expired') : t('family.expiresIn', d.daysLeft)} end={<span className={'tag ' + (d.daysLeft <= 30 ? 'tag--danger' : 'tag--warn')}>{fmtDay(d.expires_on)}</span>} />
-        ))}
-        {agenda.bills.map((b) => (
-          <Row key={b.id} icon="🧾" title={b.name} sub={relativeLabel(b.next_due_on)} end={<Money amount={b.amount} currency={b.currency} kind={b.kind} />} />
-        ))}
-        {agenda.occasions.map((o) => (
-          <Row key={o.id} icon={o.kind === 'birthday' ? '🎂' : '💍'} title={o.title} sub={relativeLabel(o.date) + (o.year && o.kind === 'birthday' ? ` · ${t('family.turns', Number(o.date.slice(0, 4)) - o.year)}` : '')} end={o.gift_ideas ? <span className="tag">🎁</span> : null} />
-        ))}
-        {agenda.events.filter((e) => e.date > T).slice(0, 4).map((e) => (
-          <Row key={e.id + e.date} icon="📅" title={e.title} sub={`${relativeLabel(e.date)} · ${e.all_day ? t('calendar.allDay') : fmtTime(e.starts_at)}`} end={<Avatars members={(e.attendees || []).map(memberById).filter(Boolean)} />} />
-        ))}
-      </Card>
-      )}
 
-      {/* Görevler — boşken çizilmez */}
-      {todayTasks.length > 0 && (
-      <Card title={t('today.tasksDue')} action={<Link className="faint" href="/aile/?tab=tasks">{t('common.seeAll')} →</Link>}>
-        {todayTasks.map((k) => (
-          <Row key={k.id} icon={<input type="checkbox" checked={k.is_done} onChange={async () => {
-            // Tekrarlayan görev bitmiş sayılmaz; vadesi sonraki tekrara taşınır (0010).
-            const next = k.rrule && k.due_on ? nextOccurrence(k.rrule, k.due_on) : null;
-            if (k.is_done) await repo.tasks.uncomplete(k.id); else await repo.tasks.complete(k.id, next);
-            bump();
-          }} style={{ width: 22, height: 22 }} />}
-            title={k.title} sub={memberById(k.assignee_member_id)?.display_name} done={k.is_done}
-            end={k.points ? <span className="tag tag--ok">⭐ {k.points}</span> : null} />
-        ))}
-      </Card>
-      )}
+      {/* Alışveriş */}
 
       </>}
 
-      {/* Alışveriş */}
+      {/* Para nabzı */}
       <Card title={`🛒 ${t('today.shopping')}`} action={<span className="faint">{t('today.itemsLeft', openShopping.length)}</span>}>
         {openShopping.slice(0, 6).map((s) => (
           <Row key={s.id} icon={<input type="checkbox" checked={false} onChange={async () => { await repo.shopping.toggleItem(s.id); bump(); }} style={{ width: 22, height: 22 }} />} title={s.name} sub={memberById(s.added_by_member_id)?.display_name} />
@@ -172,6 +194,42 @@ export default function TodayPage() {
         <ShoppingForm />
       </Card>
     </>
+  );
+}
+
+/**
+ * Bugün ekranındaki görev satırı.
+ * Tekrarlayan görevde onay kutusu görevi bitirmez, vadeyi sonraki tekrara
+ * taşır (0010) — bu yüzden satır listeden kaybolur ve üst bileşen "Yapıldı +
+ * Geri al" satırını gösterir. Geciken görevde kaç gün geciktiği yazılır;
+ * gecikmeyi bugünkü işle aynı görünüme sıkıştırmak onu görünmez yapıyordu.
+ */
+function TaskLine({ task: k, t, repo, bump, memberById, overdueFrom, onDone }) {
+  const [busy, setBusy] = useState(false);
+  const late = overdueFrom && k.due_on ? daysBetween(k.due_on, overdueFrom) : 0;
+  const sub = [
+    memberById(k.assignee_member_id)?.display_name,
+    late > 1 ? t('today.overdue', late) : late === 1 ? t('today.overdueToday') : (k.due_on ? null : t('today.noDueDate')),
+    k.rrule && '↻',
+  ].filter(Boolean).join(' · ');
+
+  return (
+    <Row
+      icon={<input type="checkbox" checked={false} disabled={busy}
+        onChange={async () => {
+          setBusy(true);
+          try {
+            const next = k.rrule && k.due_on ? nextOccurrence(k.rrule, k.due_on) : null;
+            await repo.tasks.complete(k.id, next);
+            onDone?.(k.id);
+            bump();
+          } finally { setBusy(false); }
+        }} style={{ width: 22, height: 22 }} />}
+      title={k.title} sub={sub || null}
+      end={<>
+        {late > 0 && <span className="tag tag--danger">!</span>}
+        {k.points ? <span className="tag tag--ok">⭐ {k.points}</span> : null}
+      </>} />
   );
 }
 
