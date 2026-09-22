@@ -2,9 +2,10 @@
 import { useEffect, useState } from 'react';
 import { useApp } from './AppShell.jsx';
 import { Sheet, Field } from './ui.jsx';
-import { useT } from '../lib/i18n/context.jsx';
+import { useT, useLocale } from '../lib/i18n/context.jsx';
 import { parseAmount, minorToDecimal, CURRENCY_CODES, CURRENCIES } from '../lib/money.js';
 import { today, buildRRule, freqKeyOf } from '../lib/dates.js';
+import { EXPENSE_PRESETS, presetName, presetCategoryId } from '../lib/expenseCatalog.js';
 
 const TABS = [
   { key: 'expense', icon: '💸' }, { key: 'event', icon: '📅' }, { key: 'task', icon: '✅' }, { key: 'shopping', icon: '🛒' },
@@ -48,6 +49,7 @@ function useLast() {
 export function ExpenseForm({ onDone, planId, txn, preset, checkoutListId }) {
   const { repo, accounts, categories, members, me, bump, baseCurrency } = useApp();
   const t = useT();
+  const { locale } = useLocale();
   const [last, remember] = useLast();
   const editing = Boolean(txn);
   const [kind, setKind] = useState(txn?.kind || 'expense');
@@ -62,6 +64,7 @@ export function ExpenseForm({ onDone, planId, txn, preset, checkoutListId }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [confirming, setConfirming] = useState(false);
+  const [quick, setQuick] = useState('');   // seçili hazır harcama (Uber, Metro…)
 
   useEffect(() => {
     if (editing) return;   // düzenlemede alanlar işlemden gelir, son kullanılandan değil
@@ -73,6 +76,19 @@ export function ExpenseForm({ onDone, planId, txn, preset, checkoutListId }) {
   }, [accounts, categories, last, accountId, categoryId, editing]);
 
   const onAccount = (id) => { setAccountId(id); const a = accounts.find((x) => x.id === id); if (a) setCurrency(a.currency); };
+
+  /**
+   * Hazır harcama seçimi: "nereye" ve kategoriyi birlikte doldurur.
+   * Tekrar dokunmak seçimi kaldırır ve doldurduğu alanları temizler —
+   * yanlış dokunan, iki alanı elle silmek zorunda kalmasın.
+   * Kategori eşleşmezse boş bırakılır (bkz. lib/expenseCatalog.js).
+   */
+  const pickQuick = (pr) => {
+    if (quick === pr.key) { setQuick(''); setMerchant(''); setCategoryId(''); return; }
+    setQuick(pr.key);
+    setMerchant(presetName(pr, locale));
+    setCategoryId(presetCategoryId(pr, categories));
+  };
   const cats = categories.filter((c) => c.kind === (kind === 'income' ? 'income' : 'expense'));
   const parents = cats.filter((c) => !c.parent_id);
   const childrenOf = (pid) => cats.filter((c) => c.parent_id === pid);
@@ -129,6 +145,22 @@ export function ExpenseForm({ onDone, planId, txn, preset, checkoutListId }) {
           <button type="button" key={c} className={'chip' + (currency === c ? ' chip--active' : '')} onClick={() => setCurrency(c)} title={t('currencies.' + c)}>{CURRENCIES[c].flag} {c}</button>
         ))}
       </div>
+      {/* Hazır harcamalar. Tutarı yazdıktan sonra tek dokunuş: "nereye" ve
+          kategori birlikte dolar. Yalnızca giderde anlamlı. */}
+      {kind === 'expense' && (
+        <div style={{ margin: '0 0 var(--sp-4)' }}>
+          <div className="faint" style={{ marginBottom: 'var(--sp-2)' }}>{t('money.quickPick')}</div>
+          <div className="chips">
+            {EXPENSE_PRESETS.map((pr) => (
+              <button type="button" key={pr.key}
+                className={'chip' + (quick === pr.key ? ' chip--active' : '')}
+                onClick={() => pickQuick(pr)}>
+                {pr.emoji} {presetName(pr, locale)}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="grid-2">
         <Field label={kind === 'transfer' ? t('money.fromAccount') : t('money.account')}>
           <select className="select" value={accountId} onChange={(e) => onAccount(e.target.value)}>

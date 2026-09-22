@@ -322,3 +322,16 @@ Tüm tablolar `household_id` taşır; RLS `is_household_member(household_id)`
   ızgara işaretsiz görünüp listeye ikinci bir kalem ekliyordu.
   Izgarada dokunma AÇMA/KAPAMA, ama markette işaretlenmiş kalem kilitli:
   oradan düşürmek, markette unutmak demek.
+- 2026-09-22 — **Favori elle işaretlenmiyor, sayılıyor** (0019). Elle yıldızlama
+  bir kurulum işidir ve kimse yapmaz; ilk haftadan sonra liste yanlış kalır.
+  Sayaç kendiliğinden doğrulanıyor — yazın karpuz, kışın çorbalık yukarı çıkar.
+  Sayaç ürün EKLENİRKEN artıyor, satın alınırken değil: alışveriş harcamaya
+  çevrilince kalemler siliniyor (0016), satın alma anını yakalamak ayrı bir
+  kayıt isterdi. Anahtar olarak katalog anahtarı tutuluyor, ad değil — hane
+  dilini değiştirse de sayaç taşınır.
+- 2026-09-22 — **Hazır harcama seçimleri kategoriyi DESENLE buluyor.** Kategori
+  kimliği sabitlenemez: her hane kendi kategorilerini tohumluyor ve adlar dile
+  göre değişiyor (Ulaşım / Transporte). Önce alt kategori, sonra üst kategori
+  aranıyor. Hiçbiri tutmazsa kategori BOŞ bırakılıyor — hane kategorisini
+  yeniden adlandırdıysa yanlış kategoriye yazmaktansa kullanıcı seçsin; yanlış
+  kategori sessizce bütçeyi bozar, boş kategori göze çarpar.
