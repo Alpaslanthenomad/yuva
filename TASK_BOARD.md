@@ -76,7 +76,7 @@ Faz tanımları `PROJECT_BLUEPRINT.md §5`.
 - [x] `account_balances` view'i `security_invoker` yapıldı (RLS'i atlıyordu) — 2026-09-21
 - [x] `budget_status` içindeki hatalı virgüllü JOIN düzeltildi (derlenmiyordu) — 2026-09-21
 - [x] Migration 0003: RPC yetkileri sertleştirildi; `post_due_recurring` anon'a kapatıldı — 2026-09-21
-- [ ] Vercel env değişkenleri + Supabase Auth Site URL (kullanıcı tarafında, panelden)
+- [x] Vercel ortam değişkenleri çalışıyor (site demo değil, gerçek Supabase kipinde açılıyor). Auth Site URL yalnızca e-posta bağlantısı için gerekiyordu; magic link kaldırıldığı için konu dışı — 2026-09-22
 - [ ] İlk gerçek hane kurulumu ve eşin katılım kodu ile girişi
 - [x] Giriş **e-posta + şifreye** çevrildi; magic link kaldırıldı — 2026-09-21
 - [x] Ayarlar › Şifre değiştirme — 2026-09-21
@@ -89,7 +89,7 @@ Faz tanımları `PROJECT_BLUEPRINT.md §5`.
 - [x] Alt menü emoji → çizgi ikon; `+` butonu içeriğin üstüne binmiyor;
       Para sekmeleri kaydırılabilir; "Üyeye göre" boş durumu — 2026-09-21
 - [x] Aile: üye düzenleme + haneden çıkarma (soft delete) — 2026-09-21
-- [ ] Vercel: Deployment Protection kapatılsın (eş siteyi açamıyor)
+- [x] Vercel Authentication kapatıldı — eş siteyi açabiliyor. Hobby planında ara yol yoktu: özel alan adı olmadığı için "Standard Protection" de `*.vercel.app` adresini koruyordu, Password Protection ise ücretli. Site artık adresi bilene açık; veriyi uygulamanın kendi girişi ve RLS koruyor. Hesaba girili olmayan bir tarayıcıdan doğrulandı: karşılama + giriş ekranı geliyor — 2026-09-22
 - [ ] `supabaseRepo` kalan contract metodlarını gerçek sorgularla doldur
 - [ ] Takvim: hafta görünümü sürükle-kaydır; RRULE düzenleme UI; çakışma uyarısı
 - [ ] Para: işlem düzenleme/silme; filtre (ay/üye/kategori/hesap); rapor grafikleri
