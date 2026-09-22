@@ -17,6 +17,11 @@ export default function AppShell({ children }) {
   const [state, setState] = useState({ loading: true, household: null, members: [], me: null, user: null, accounts: [], categories: [], rates: {} });
   const [quickOpen, setQuickOpen] = useState(false);
   const [tick, setTick] = useState(0);
+  // Bağlantı durumu. Uygulamanın çevrimdışı yazma kuyruğu YOK; bu yüzden
+  // "senkron bekliyor" demek yanlış olurdu — çevrimdışıyken değişiklik
+  // kaydedilmiyor ve kullanıcıya bunu açıkça söylüyoruz.
+  const [online, setOnline] = useState(true);
+  const [channel, setChannel] = useState('SUBSCRIBED');
 
   const reload = useCallback(async () => {
     try {
@@ -38,6 +43,15 @@ export default function AppShell({ children }) {
   }, [repo, applyHouseholdDefault]);
 
   useEffect(() => { reload(); }, [reload]);
+
+  useEffect(() => {
+    if (typeof navigator === 'undefined') return;
+    const sync = () => setOnline(navigator.onLine);
+    sync();
+    window.addEventListener('online', sync);
+    window.addEventListener('offline', sync);
+    return () => { window.removeEventListener('online', sync); window.removeEventListener('offline', sync); };
+  }, []);
 
   // PWA service worker
   useEffect(() => {
@@ -63,7 +77,7 @@ export default function AppShell({ children }) {
       timer = setTimeout(() => {
         if (deep) { deep = false; reload(); } else setTick((x) => x + 1);
       }, 400);
-    });
+    }, setChannel);
     return () => { clearTimeout(timer); if (typeof unsub === 'function') unsub(); };
   }, [repo, state.household?.id, reload]);
   const value = useMemo(() => ({
@@ -83,6 +97,18 @@ export default function AppShell({ children }) {
       <div className="shell">
         <main className="shell__main">
           {repo.mode === 'demo' && !isAuthPage && <div className="banner">{t('common.demoBanner')}</div>}
+          {/* Sağlıklıyken hiçbir şey gösterilmez; kalıcı yeşil rozet gürültüdür.
+              Yalnızca veriye güvenilemeyecek durumda uyarı çıkar. */}
+          {!isAuthPage && !online && (
+            <div className="banner banner--danger">
+              <strong>{t('sync.offline')}</strong> — {t('sync.offlineHint')}
+            </div>
+          )}
+          {!isAuthPage && online && repo.mode === 'supabase' && channel !== 'SUBSCRIBED' && (
+            <div className="banner">
+              <strong>{t('sync.reconnecting')}</strong> — {t('sync.reconnectingHint')}
+            </div>
+          )}
           {state.loading ? <div className="empty">{t('common.loading')}</div>
             : needsAuth && !isAuthPage ? <AuthGate />
             : children}

@@ -237,6 +237,7 @@ ul { margin: 0; padding: 0; list-style: none; }
 
 .empty { text-align: center; color: var(--color-text-3); padding: var(--sp-6) 0; font-size: var(--fs-sm); }
 .banner { background: var(--color-accent-soft); color: var(--color-warn); border-radius: var(--radius-md); padding: var(--sp-2) var(--sp-3); font-size: var(--fs-sm); margin-bottom: var(--sp-3); }
+.banner--danger { background: var(--color-danger-soft); color: var(--color-danger); }
 .spacer { height: var(--sp-4); }
 .inline { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
 .between { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); }

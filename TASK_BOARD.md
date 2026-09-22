@@ -49,7 +49,7 @@ Faz tanımları `PROJECT_BLUEPRINT.md §5`.
 - [x] Plan–takvim bağı: plan tarihleri takvimde ve Bugün ekranında bant olarak görünüyor ("5. gün / 22"), tıklayınca Planlar'a gidiyor. Kopya olay yazılmıyor — tek kaynak `plans`. Birikim hedefleri banda girmiyor — 2026-09-22
 - [x] Tam yedek: `export_household` RPC (migration 0012), Ayarlar'da tek düğmeyle 19 bölümlük JSON iniyor; tarayıcıda uçtan uca denendi (118 kayıt) — 2026-09-22
 - [ ] Yedekten geri yükleme (`import_household`) — yedek formatı `yuva-backup-1` bunun için sürümlendi
-- [ ] "Kaydedildi / senkron bekliyor" göstergesi (Realtime var, durum çubuğu yok)
+- [x] Bağlantı durumu şeridi: çevrimdışıyken ve Realtime kanalı kopukken uyarı çıkıyor, sağlıklıyken hiçbir şey gösterilmiyor; tarayıcıda çevrimdışı simüle edilerek denendi — 2026-09-22
 - [ ] Gerçek çevrimdışı veri katmanı (service worker kabuğu var, veri yok)
 
 - [x] Supabase projesi `yuva` (sa-east-1) açıldı; 0001a/0001b/0002/0003 uygulandı; kurlar tohumlandı — 2026-09-21

@@ -6,6 +6,7 @@
   --color-brand-ink: #1F4A3F;
   --color-accent: #E9A23B;         /* sıcak sarı — para/uyarı vurgusu */
   --color-accent-soft: #FBEFD9;
+  --color-danger-soft: #FBE3DF;   /* bağlantı/çevrimdışı uyarı şeridi */
 
   /* Yüzeyler */
   --color-bg: #F6F5F1;
@@ -67,6 +68,7 @@
     --color-brand-ink: #CFEADF;
     --color-accent: #F0B85C;
     --color-accent-soft: #3A2E17;
+    --color-danger-soft: #3A1E1A;
     --color-bg: #121311;
     --color-surface: #1C1E1B;
     --color-surface-2: #242723;
