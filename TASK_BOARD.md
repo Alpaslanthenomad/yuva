@@ -48,7 +48,7 @@ Faz tanımları `PROJECT_BLUEPRINT.md §5`.
 - [x] Bugün ekranı önceliklendirildi: Bugün / Bekleyen işler / Sıradaki 7 gün sırası; geciken görev ayrı gösteriliyor (kaç gün geciktiğiyle), görev tamamlamada "Geri al", bildirimler tek satıra katlandı, hafta şeridi 7 gün kartına taşındı, para kartı aşağı indi — 2026-09-22
 - [x] Plan–takvim bağı: plan tarihleri takvimde ve Bugün ekranında bant olarak görünüyor ("5. gün / 22"), tıklayınca Planlar'a gidiyor. Kopya olay yazılmıyor — tek kaynak `plans`. Birikim hedefleri banda girmiyor — 2026-09-22
 - [x] Tam yedek: `export_household` RPC (migration 0012), Ayarlar'da tek düğmeyle 19 bölümlük JSON iniyor; tarayıcıda uçtan uca denendi (118 kayıt) — 2026-09-22
-- [ ] Yedekten geri yükleme (`import_household`) — yedek formatı `yuva-backup-1` bunun için sürümlendi
+- [x] Yedekten geri yükleme (`import_household`, migration 0018) — 2026-09-22
 - [x] Bağlantı durumu şeridi: çevrimdışıyken ve Realtime kanalı kopukken uyarı çıkıyor, sağlıklıyken hiçbir şey gösterilmiyor; tarayıcıda çevrimdışı simüle edilerek denendi — 2026-09-22
 - [x] Bildirim merkezi + sabah özeti: `post_morning_digest` her sabah 07:00'de (Santiago) günün özetini yazıyor — söyleyecek bir şey yoksa bildirim üretmiyor; Bugün'de geçmiş listesi ve "tümünü okundu işaretle" (migration 0013) — 2026-09-22
 - [x] **Hata düzeltme:** tekrarlayan görevde "Geri al" vadeyi geri almıyordu; görev gelecek haftaya kaçmış kalıyordu. Tamamlama kaydı artık önceki vadeyi saklıyor (migration 0014) — 2026-09-22
@@ -81,7 +81,7 @@ Faz tanımları `PROJECT_BLUEPRINT.md §5`.
 - [x] Giriş **e-posta + şifreye** çevrildi; magic link kaldırıldı — 2026-09-21
 - [x] Ayarlar › Şifre değiştirme — 2026-09-21
 - [x] İlk hane kuruldu ("Bizim Ev", CLP, TR); 52 kategori tohumlandı — 2026-09-21
-- [ ] Supabase: "Confirm email" kapatılsın (eşin hesap açabilmesi için)
+- [ ] Supabase: "Confirm email" — artık zorunlu değil. Kapalı değilse eş kayıt olduktan sonra hesabı veritabanından onaylı işaretlenebiliyor
 - [x] İlk kullanım deneyimi: boş hanede tek yönlendirme kartı; boş kartlar çizilmiyor — 2026-09-21
 - [x] Açılış hızı: 10 istek → 2 (`app_bootstrap` + `today_snapshot`, migration 0004).
       Oturum açıkken yenileme ~8 sn → ~1 sn — 2026-09-21
@@ -92,13 +92,14 @@ Faz tanımları `PROJECT_BLUEPRINT.md §5`.
 - [x] Vercel Authentication kapatıldı — eş siteyi açabiliyor. Hobby planında ara yol yoktu: özel alan adı olmadığı için "Standard Protection" de `*.vercel.app` adresini koruyordu, Password Protection ise ücretli. Site artık adresi bilene açık; veriyi uygulamanın kendi girişi ve RLS koruyor. Hesaba girili olmayan bir tarayıcıdan doğrulandı: karşılama + giriş ekranı geliyor — 2026-09-22
 - [ ] `supabaseRepo` kalan contract metodlarını gerçek sorgularla doldur
 - [ ] Takvim: hafta görünümü sürükle-kaydır; RRULE düzenleme UI; çakışma uyarısı
-- [ ] Para: işlem düzenleme/silme; filtre (ay/üye/kategori/hesap); rapor grafikleri
+- [x] Para: işlem düzenleme ve silme — 2026-09-22
+- [ ] Para: filtre (ay/üye/kategori/hesap) ve rapor grafikleri
 - [x] Para: pg_cron her gün 12:00 UTC (≈ Santiago 09:00) `post_due_recurring` çalıştırıyor; fonksiyon artık gecikmiş dönemleri tek seferde yakalıyor, otomatik giderde her dönem için ayrı işlem yazıyor (migration 0011) — 2026-09-22
-- [ ] Bütçe ekranı: kategori bazlı aylık zarflar + %80/%100 uyarısı
-- [ ] Alışveriş: "işaretlileri harcamaya çevir"
+- [x] Bütçe ekranı: kategori bazlı aylık zarflar; %80 uyarı / %100 aşım durumu `budgetState` içinde — 2026-09-22
+- [x] Alışveriş: "işaretlileri harcamaya çevir" — tek işlemde (migration 0016) — 2026-09-22
 - [ ] Planlar: seyahat detay (itinerary + rezervasyon + bavul listesi + bütçe vs gerçek)
-- [ ] Aile: belge süreleri + hatırlatma; önemli günler yıllık tekrar
-- [ ] Bildirim merkezi (uygulama içi) + sabah özeti RPC
+- [x] Aile: belge süreleri (ekran + sabah özetinde hatırlatma) ve önemli günler yıllık tekrar — 2026-09-22
+- [x] Bildirim merkezi (Bugün ekranında geçmiş) + sabah özeti RPC, kişiye özel (0013 + 0017) — 2026-09-22
 - [ ] Playwright duman testi: giriş → harcama ekle → raporda gör
 - [ ] Ailede 1 hafta gerçek kullanım → geri bildirim → eleme
 
@@ -111,7 +112,6 @@ Faz tanımları `PROJECT_BLUEPRINT.md §5`.
 - [ ] ICS içe/dışa aktarma; "Kim müsait?" boş zaman bulucu
 - [ ] Yemek planı + malzeme → alışveriş listesi
 - [ ] Notlar & pano
-- [ ] Çevrimdışı yazma kuyruğu
 - [ ] Net varlık ekranı
 - [ ] Plan şablonları
 
