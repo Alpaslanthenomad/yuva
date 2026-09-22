@@ -43,7 +43,9 @@ Faz tanımları `PROJECT_BLUEPRINT.md §5`.
 - [x] Katılım kodu sertleştirildi: süre + kullanım hakkı + hangi rolle katılınacağı; `rotate_join_code` RPC ve Ayarlar'da 'Yeni kod üret' — 2026-09-21
 - [x] Migration 0007 canlı veritabanına uygulandı ve doğrulandı; hane kodu `6C69FFC6` rol=adult · 1 kullanım · 2026-10-22'ye kadar geçerli — 2026-09-21
 - [x] Tekrarlayan olayda tek günü atlama: migration 0008 (`event_skip_occurrence`), Takvim'de "Yalnızca bu gün" / "Tüm seri" seçimi; canlıya uygulandı — 2026-09-21
-- [ ] Cihazlar arası canlı yenileme (Supabase Realtime)
+- [x] Cihazlar arası canlı yenileme: migration 0009 (18 tablo yayında, `replica identity full`), `repo.subscribe` + AppShell'de 400 ms'lik toplama; canlıya uygulandı — 2026-09-21
+- [ ] "Kaydedildi / senkron bekliyor" göstergesi (Realtime var, durum çubuğu yok)
+- [ ] Gerçek çevrimdışı veri katmanı (service worker kabuğu var, veri yok)
 
 - [x] Supabase projesi `yuva` (sa-east-1) açıldı; 0001a/0001b/0002/0003 uygulandı; kurlar tohumlandı — 2026-09-21
 - [x] `account_balances` view'i `security_invoker` yapıldı (RLS'i atlıyordu) — 2026-09-21

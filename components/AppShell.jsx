@@ -47,6 +47,25 @@ export default function AppShell({ children }) {
   }, []);
 
   const bump = useCallback(() => setTick((x) => x + 1), []);
+
+  // Canlı yenileme (0009): başka bir cihazda veri değişince ekran kendiliğinden
+  // tazelenir. Aynı anda gelen olaylar 400 ms'de tek yenilemeye indirilir; bir
+  // alışveriş listesini işaretlemek onlarca olay üretebiliyor.
+  // Hane/üye/hesap/kategori değiştiyse tick yetmez — kabuk verisi de yenilenir.
+  useEffect(() => {
+    const hid = state.household?.id;
+    if (!hid || typeof repo.subscribe !== 'function') return;
+    let timer = null;
+    let deep = false;
+    const unsub = repo.subscribe((table) => {
+      if (['households', 'household_members', 'accounts', 'categories'].includes(table)) deep = true;
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (deep) { deep = false; reload(); } else setTick((x) => x + 1);
+      }, 400);
+    });
+    return () => { clearTimeout(timer); if (typeof unsub === 'function') unsub(); };
+  }, [repo, state.household?.id, reload]);
   const value = useMemo(() => ({
     repo, ...state, tick, bump, reload, locale,
     memberById: (id) => state.members.find((m) => m.id === id),

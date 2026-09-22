@@ -237,3 +237,28 @@ Tüm tablolar `household_id` taşır; RLS `is_household_member(household_id)`
   dili haneye bağlamak bir kişiyi yanlış dile mahkûm ederdi.
   Kullanıcının girdiği veri (kategori adı, olay başlığı, not) **çevrilmez**;
   yalnızca arayüz metinleri, tarihler ve tatil adları dile duyarlıdır.
+
+- 2026-09-21 — Dış inceleme sonrası **doğruluk turu** (migration 0006–0009).
+  Para hesapları düzeltildi: toplam bütçe satırı harcamayı 0 gösteriyordu
+  (NULL kategori hiçbir harcamayla eşleşmiyordu), aynı döneme birden fazla
+  toplam bütçe girilebiliyordu (Postgres UNIQUE'inde NULL'lar farklı sayılır),
+  sabit/değişken gider hiç hesaplanmıyordu, plan harcaması gelir ve transferleri
+  de topluyor ve her işlemi güncel kurla yeniden çeviriyordu.
+  **Karar: tutarlar işlem anında dondurulan `amount_base` üzerinden okunur**,
+  ön yüz kur hesabı yapmaz — geçmiş maliyet kur oynadıkça değişmemeli.
+- 2026-09-21 — **Para yalnızca yetişkine** (migration 0007). Blueprint bunu
+  zaten söylüyordu ama RLS şablonu finansal tabloları tüm üyelere açıyordu;
+  üstelik `security definer` RPC'ler RLS'i atlıyordu. Kural tek fonksiyonda
+  toplandı (`can_see_money`) — gerekçe: ileride 'teen' gibi bir rol eklenirse
+  tek yerden değişsin. Katılım kodu da **süreli + kullanım sınırlı + rol
+  taşıyan** hale getirildi; eskiden kodu bilen herkes onay beklemeden yetişkin
+  oluyordu.
+- 2026-09-21 — **Tekrarlayan olayda tek gün** `exdates`'e yazılır (0008); seri
+  silinmez. RPC olarak yazıldı — diziyi ön yüzden oku-değiştir-yaz yapmak iki
+  kişi aynı anda dokunduğunda birinin değişikliğini yok ediyordu.
+- 2026-09-21 — **Canlı yenileme** Supabase Realtime ile (0009). Tablolara
+  `replica identity full` verildi; varsayılanda DELETE olayı yalnızca birincil
+  anahtarı taşıdığı için `household_id` süzgeci silmeleri yakalamıyor ve
+  silinen satır diğer cihazda ekranda kalıyordu. Olaylar 400 ms'de tek
+  yenilemeye indirilir; hane/üye/hesap/kategori değişince kabuk verisi de
+  yeniden yüklenir.
