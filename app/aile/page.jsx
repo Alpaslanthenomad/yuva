@@ -61,7 +61,7 @@ export default function FamilyPage() {
           </Card>
           <button className="btn btn--outline btn--block" onClick={() => { setEditing(null); setSheet('member'); }}>+ {t('family.addMember')}</button>
           <div className="spacer" />
-          <div className="faint">{t('settings.joinCode')}: <span className="mono">{household.join_code}</span> — {t('family.childrenNoAccount')}</div>
+          {household.join_code && <div className="faint">{t('settings.joinCode')}: <span className="mono">{household.join_code}</span> — {t('family.childrenNoAccount')}</div>}
         </>
       )}
 

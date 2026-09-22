@@ -38,8 +38,10 @@ Faz tanımları `PROJECT_BLUEPRINT.md §5`.
 - [x] Depo kökündeki 37 mükerrer dosya kaldırıldı — 2026-09-21
 - [x] Migration 0006 yazıldı: toplam bütçe harcaması, bütçe tekilliği, sabit/değişken gider, katkılarda dondurulmuş kur, `budget_set` RPC — 2026-09-21
 - [x] `planTotals`: plan harcaması yalnızca giderlerden ve dondurulmuş `amount_base` ile hesaplanıyor (gelir/transfer artık sayılmıyor) — 2026-09-21
-- [ ] **Migration 0006 canlı veritabanına uygulanacak** (Supabase SQL Editor)
-- [ ] Rol/gizlilik: misafir finansal tabloları okuyabiliyor; katılım kodunun süresi ve tek kullanım sınırı yok → migration 0007
+- [x] Migration 0006 canlı veritabanına uygulandı ve doğrulandı — 2026-09-21
+- [x] Migration 0007 yazıldı: finansal tablolarda okuma yalnızca yetişkine; month_summary/budget_status/today_snapshot/app_bootstrap aynı sınırı uyguluyor; app_bootstrap hesapları ve katılım kodunu artık misafire vermiyor — 2026-09-21
+- [x] Katılım kodu sertleştirildi: süre + kullanım hakkı + hangi rolle katılınacağı; `rotate_join_code` RPC ve Ayarlar'da 'Yeni kod üret' — 2026-09-21
+- [ ] **Migration 0007 canlı veritabanına uygulanacak** (Supabase SQL Editor)
 - [ ] Tekrarlayan olayda tek bir günü silme (exdate) — şu an tüm seri siliniyor
 - [ ] Cihazlar arası canlı yenileme (Supabase Realtime)
 

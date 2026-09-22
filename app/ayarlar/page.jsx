@@ -12,6 +12,7 @@ export default function SettingsPage() {
   const { locale } = useLocale();
   const [f, setF] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [rotating, setRotating] = useState(false);
   if (!household) return <Empty>{t('common.loading')}</Empty>;
 
   const form = f || {
@@ -60,6 +61,8 @@ export default function SettingsPage() {
         </form>
       </Card>
 
+      {/* Kod yalnızca yetişkine döner (0007); misafirde alan hiç gelmez. */}
+      {household.join_code && (
       <Card title={t('settings.joinCode')}>
         <div className="between">
           <span className="mono" style={{ fontSize: 'var(--fs-xl)', letterSpacing: '.1em' }}>{household.join_code}</span>
@@ -68,7 +71,16 @@ export default function SettingsPage() {
           </button>
         </div>
         <div className="faint" style={{ marginTop: 'var(--sp-2)' }}>{t('settings.joinCodeHint')}</div>
+        <div className="faint" style={{ marginTop: 'var(--sp-1)' }}>
+          {household.join_code_uses_left === 0 ? t('settings.joinCodeSpent') : t('settings.joinCodeLimit')}
+        </div>
+        <button type="button" className="btn btn--ghost btn--block" style={{ marginTop: 'var(--sp-2)' }}
+          disabled={rotating}
+          onClick={async () => { setRotating(true); try { await repo.household.rotateJoinCode(); await reload(); } finally { setRotating(false); } }}>
+          {t('settings.newCode')}
+        </button>
       </Card>
+      )}
 
       <Card title={t('settings.accounts')}>
         {accounts.map((a) => <Row key={a.id} icon={a.icon} title={a.name} sub={`${a.currency} · ${t('currencies.' + a.currency)}`} />)}
