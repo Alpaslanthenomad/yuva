@@ -84,8 +84,10 @@ migration, sonra contract, sonra iki repo, sonra ekran.
    Açılım (expansion) frontend'de `lib/dates.js` ile; DB'de "sonraki vade"
    `next_due_on` kolonunda önbelleklenir.
 5. **RLS**: `public.is_household_member(hid)` ve `public.is_household_adult(hid)`
-   `security definer` fonksiyonları. Okuma: üye; yazma: yetişkin (takvim, görev
-   ve alışveriş listesinde misafir de yazabilir).
+   `security definer` fonksiyonları. Okuma: üye; yazma: yetişkin. Finansal
+   tablolarda okuma da yalnızca yetişkine açıktır (`can_see_money`, 0007).
+   Misafir rolü 0015'te kaldırıldı: çocuk profillerinin hesabı olmadığı için
+   giriş yapabilen her üye zaten yetişkindir.
 6. **Silme**: yumuşak silme yok; `activity_log` her insert/update/delete'i
    JSON olarak saklar (geri alma kaynağı).
 7. **RPC'ler** (Faz 0'da tanımlı): `create_household`, `join_household`,

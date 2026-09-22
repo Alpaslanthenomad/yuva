@@ -32,7 +32,8 @@ Bu repo'da çalışan her AI ajanı ve insan geliştirici şu sırayla okur:
    Tarihler `lib/dates.js` içinde dile duyarlıdır (`setDateLocale`), tatil
    adları `lib/holidays.js`'te anahtar olarak tutulup sözlükten çözülür.
    Dil **kişi başınadır**: cihazda `localStorage` (`yuva:locale`), varsayılanı
-   `households.locale`. Anne Türkçe, bakıcı İspanyolca kullanabilir — veri ortak.
+   `households.locale`. Hane Şili'de yaşıyor; bir üye Türkçe, bir başkası
+   İspanyolca kullanabilir — veri ortak, yalnızca arayüz dili kişiseldir.
 8. **Para asla float.** Görüntüde `formatMoney`; hesapta tam sayı kuruş/peso
    (`lib/money.js`). CLP'nin ondalığı yoktur, TRY/USD 2 ondalık.
 9. **Demo mod bozulmaz.** `.env` olmadan `npm run dev` çalışır ve demo veriyle

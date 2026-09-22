@@ -34,9 +34,15 @@ hem "önemli gün"dür, hem davet planıdır, hem hediye harcamasıdır. **Bağl
 |-----|-----|----------|
 | **Yetişkin (adult)** | Ebeveynler, hesaplı büyükler | Her şeyi görür/düzenler; para modülü, ayarlar, üyeler |
 | **Çocuk (child) — profil** | Çocuklar (hesapsız) | Takvimde, görevlerde, harçlıkta *özne* olarak yer alır; giriş yapmaz. İleride "sınırlı hesap" olabilir |
-| **Misafir (guest)** | Bakıcı, büyükanne, ev arkadaşı | Sadece paylaşılan takvim + alışveriş listesi; para göremez |
 
 Karar: **Yetişkinler hesap açar, çocuklar profildir.** (2026-09-20)
+
+Karar: **Misafir rolü kaldırıldı.** (2026-09-22) Uygulama yalnızca hanenin
+kendi üyeleri için; bakıcı gibi dışarıdan biri senaryosu yok. Üç rollü model
+gereksiz karmaşıklık ve sızıntı yüzeyiydi — dış incelemede misafirin ajanda
+üzerinden ödeme tutarlarını görebildiği bulunmuştu. Artık giriş yapabilen
+her üye yetişkin olduğu için "misafir para göremez" şartı yapısal olarak
+sağlanıyor, kontrol edilecek bir durum kalmıyor.
 
 ## 2. Tasarım ilkeleri (değişmez)
 

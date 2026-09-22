@@ -56,11 +56,11 @@ Faz tanımları `PROJECT_BLUEPRINT.md §5`.
 
 ### Dış incelemenin açık bıraktıkları (2026-09-22, ikinci tur — 7/10)
 
+- [x] **Misafir rolü kaldırıldı** (migration 0015). Giriş yapabilen her üye artık yetişkin; "misafir para göremez" şartı yapısal olarak sağlanıyor, ajanda ve katılım kodu sızıntıları da bu yüzden kapandı — 2026-09-22
+
 - [ ] Hızlı ekleme alışverişte liste kimliği göndermiyor; liste içinden ekleme ile aynı davranmıyor
 - [ ] "Alışverişi harcamaya çevir" iki ayrı işlem — ikincisi başarısız olursa aynı alışveriş tekrar çevrilebiliyor (tek RPC olmalı)
 - [ ] Görev oluşturma formunda tekrar seçeneği yok — altyapı var, giriş yolu yok
-- [ ] `upcoming_agenda` misafire düzenli ödeme tutarlarını döndürüyor
-- [ ] `households` okuma politikası `join_code` kolonunu ayrıca korumuyor
 - [ ] Sabah özeti bildirimi alıcı üyeye göre süzülmüyor
 - [ ] Yeniden bağlanınca kaçırılan değişiklikler için tam yenileme yok
 - [ ] Plan düzenleme (tarih/başlık/durum/bütçe) ve hedefe katkı ekleme ekranı yok

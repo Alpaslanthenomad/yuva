@@ -199,7 +199,7 @@ function MemberForm({ t, member, isSelf, onDone }) {
     <form onSubmit={submit}>
       <Field label={t('family.memberName')}><input className="input" autoFocus value={f.display_name} onChange={up('display_name')} /></Field>
       <div className="grid-3">
-        <Field label={t('family.role')}><select className="select" value={f.role} onChange={up('role')}>{['adult', 'child', 'guest'].map((r) => <option key={r} value={r}>{t('family.roles.' + r)}</option>)}</select></Field>
+        <Field label={t('family.role')}><select className="select" value={f.role} onChange={up('role')}>{['adult', 'child'].map((r) => <option key={r} value={r}>{t('family.roles.' + r)}</option>)}</select></Field>
         <Field label={t('family.emoji')}><input className="input" value={f.avatar_emoji} onChange={up('avatar_emoji')} /></Field>
         <Field label={t('family.color')}><input className="input" type="color" value={f.color} onChange={up('color')} /></Field>
       </div>
