@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { startOfWeek, weekDays, monthGrid, expandRRule, nextOccasionDate, overlaps, addMonths, relativeLabel } from '../lib/dates.js';
+import { startOfWeek, weekDays, monthGrid, expandRRule, nextOccurrence, nextOccasionDate, overlaps, addMonths, relativeLabel } from '../lib/dates.js';
 import { easterSunday, holidaysCL, holidaysTR, holidayMap } from '../lib/holidays.js';
 
 test('startOfWeek Pazartesi', () => {
@@ -75,4 +75,27 @@ test('expandRRule exdate: tek gün atlanır, seri bozulmaz', () => {
 test('expandRRule exdate BYDAY ile de çalışır', () => {
   const r = expandRRule('FREQ=WEEKLY;BYDAY=MO,TH', '2026-09-14', '2026-09-14', '2026-09-27', ['2026-09-17', '2026-09-21']);
   assert.deepEqual(r, ['2026-09-14', '2026-09-24']);
+});
+
+test('nextOccurrence: haftalık görev bir sonraki haftaya taşınır', () => {
+  assert.equal(nextOccurrence('FREQ=WEEKLY', '2026-09-23'), '2026-09-30');
+  assert.equal(nextOccurrence('FREQ=WEEKLY;INTERVAL=2', '2026-09-23'), '2026-10-07');
+});
+test('nextOccurrence: aylık ve günlük', () => {
+  assert.equal(nextOccurrence('FREQ=DAILY', '2026-09-23'), '2026-09-24');
+  // Şubatta 31 yok: kural ayın sonuna kırpılır (ay atlanmaz). Aylık bir ev işi
+  // için doğru davranış bu — "her ayın sonu" beklenir, şubat boş geçmez.
+  assert.equal(nextOccurrence('FREQ=MONTHLY', '2026-01-31'), '2026-02-28');
+  assert.equal(nextOccurrence('FREQ=MONTHLY', '2026-02-28'), '2026-03-28');
+});
+test('nextOccurrence: BYDAY ile hafta içi sıradaki gün', () => {
+  // Pazartesi/Perşembe kuralı, Pazartesi 14 Eylül'den sonrası → Perşembe 17 Eylül
+  assert.equal(nextOccurrence('FREQ=WEEKLY;BYDAY=MO,TH', '2026-09-14'), '2026-09-17');
+});
+test('nextOccurrence: kural yoksa veya vade yoksa null', () => {
+  assert.equal(nextOccurrence(null, '2026-09-23'), null);
+  assert.equal(nextOccurrence('FREQ=WEEKLY', null), null);
+});
+test('nextOccurrence: UNTIL geçtiyse null', () => {
+  assert.equal(nextOccurrence('FREQ=WEEKLY;UNTIL=20260925', '2026-09-23'), null);
 });

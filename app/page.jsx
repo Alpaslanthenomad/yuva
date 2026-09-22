@@ -5,7 +5,7 @@ import { useApp } from '../components/AppShell.jsx';
 import { Card, Row, Money, Bar, Avatars, Empty } from '../components/ui.jsx';
 import { ShoppingForm } from '../components/QuickAdd.jsx';
 import { useT } from '../lib/i18n/context.jsx';
-import { today, periodOf, fmtDayLong, fmtTime, relativeLabel, weekDays, dowNames, fromISODate, fmtDay } from '../lib/dates.js';
+import { today, periodOf, fmtDayLong, fmtTime, relativeLabel, weekDays, dowNames, fromISODate, fmtDay, nextOccurrence } from '../lib/dates.js';
 import { formatMoney, budgetState, dailyAllowance } from '../lib/money.js';
 import { holidayMap } from '../lib/holidays.js';
 
@@ -149,7 +149,12 @@ export default function TodayPage() {
       {todayTasks.length > 0 && (
       <Card title={t('today.tasksDue')} action={<Link className="faint" href="/aile/?tab=tasks">{t('common.seeAll')} →</Link>}>
         {todayTasks.map((k) => (
-          <Row key={k.id} icon={<input type="checkbox" checked={k.is_done} onChange={async () => { await repo.tasks.toggle(k.id); bump(); }} style={{ width: 22, height: 22 }} />}
+          <Row key={k.id} icon={<input type="checkbox" checked={k.is_done} onChange={async () => {
+            // Tekrarlayan görev bitmiş sayılmaz; vadesi sonraki tekrara taşınır (0010).
+            const next = k.rrule && k.due_on ? nextOccurrence(k.rrule, k.due_on) : null;
+            if (k.is_done) await repo.tasks.uncomplete(k.id); else await repo.tasks.complete(k.id, next);
+            bump();
+          }} style={{ width: 22, height: 22 }} />}
             title={k.title} sub={memberById(k.assignee_member_id)?.display_name} done={k.is_done}
             end={k.points ? <span className="tag tag--ok">⭐ {k.points}</span> : null} />
         ))}

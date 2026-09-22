@@ -4,7 +4,7 @@ import { useApp } from '../../components/AppShell.jsx';
 import { Card, Row, Chips, Empty, Sheet, Field, Avatar } from '../../components/ui.jsx';
 import { TaskForm, ShoppingForm, ExpenseForm } from '../../components/QuickAdd.jsx';
 import { useT } from '../../lib/i18n/context.jsx';
-import { today, fmtDay, relativeLabel, weekDays } from '../../lib/dates.js';
+import { today, fmtDay, relativeLabel, weekDays, startOfWeek, nextOccurrence } from '../../lib/dates.js';
 
 const TABS = ['members', 'occasions', 'documents', 'tasks', 'shopping'];
 
@@ -31,8 +31,9 @@ export default function FamilyPage() {
   useEffect(() => { try { const x = new URLSearchParams(window.location.search).get('tab'); if (x && TABS.includes(x)) setTab(x); } catch { /* */ } }, []);
   useEffect(() => {
     if (!household) return;
-    Promise.all([repo.occasions.list(), repo.documents.list(), repo.tasks.list(), repo.shopping.lists(), repo.shopping.items()])
-      .then(([occasions, documents, tasks, lists, items]) => setD({ occasions, documents, tasks, lists, items }));
+    Promise.all([repo.occasions.list(), repo.documents.list(), repo.tasks.list(), repo.shopping.lists(), repo.shopping.items(),
+      repo.tasks.completions(startOfWeek(today()))])
+      .then(([occasions, documents, tasks, lists, items, completions]) => setD({ occasions, documents, tasks, lists, items, completions }));
   }, [repo, household, tick]);
 
   if (!d) return <Empty>{t('common.loading')}</Empty>;
@@ -49,7 +50,9 @@ export default function FamilyPage() {
         <>
           <Card>
             {members.map((m) => {
-              const pts = d.tasks.filter((k) => k.assignee_member_id === m.id && k.is_done && k.done_at && k.done_at.slice(0, 10) >= wk[0]).reduce((s, k) => s + (k.points || 0), 0);
+              // Puan tamamlama kaydından okunur: tekrarlayan görevde satır "bitti"
+              // kalmadığı için is_done/done_at üstünden saymak sıfır gösterirdi (0010).
+              const pts = (d.completions || []).filter((c) => c.member_id === m.id && c.done_on >= wk[0]).reduce((s, c) => s + (c.points || 0), 0);
               return (
                 <Row key={m.id} icon={<Avatar member={m} />} title={m.display_name} sub={`${t('family.roles.' + m.role)}${m.birthdate ? ' · ' + fmtDay(m.birthdate) + ' ' + m.birthdate.slice(0, 4) : ''}`}
                   onClick={() => { setEditing(m); setSheet('member'); }}
@@ -96,11 +99,7 @@ export default function FamilyPage() {
       {tab === 'tasks' && (
         <>
           <Card>
-            {d.tasks.map((k) => (
-              <Row key={k.id} icon={<input type="checkbox" checked={k.is_done} onChange={async () => { await repo.tasks.toggle(k.id); bump(); }} style={{ width: 22, height: 22 }} />}
-                title={k.title} done={k.is_done} sub={[memberById(k.assignee_member_id)?.display_name, k.due_on && relativeLabel(k.due_on), k.rrule && '↻', k.plan_id && '🧭'].filter(Boolean).join(' · ')}
-                end={k.points ? <span className="tag tag--ok">⭐ {k.points}</span> : null} />
-            ))}
+            {d.tasks.map((k) => <TaskRow key={k.id} task={k} t={t} repo={repo} bump={bump} members={members} memberById={memberById} />)}
             {d.tasks.length === 0 && <Empty>{t('common.empty')}</Empty>}
           </Card>
           <Card title={t('family.addTask')}><TaskForm /></Card>
@@ -286,5 +285,49 @@ function DocumentForm({ t, onDone }) {
       <Field label={t('family.numberHint')}><input className="input" maxLength={8} value={f.number_hint} onChange={up('number_hint')} placeholder="…4471" /></Field>
       <button className="btn btn--block">{t('common.save')}</button>
     </form>
+  );
+}
+
+/**
+ * Görev satırı. Tekrarlayan görevde onay kutusu görevi "bitti" yapmaz; vadeyi
+ * bir sonraki tekrara taşır (0010). Ertele/atla/sorumlu değiştir eylemleri
+ * yalnızca satıra dokununca açılır — liste kalabalıklaşmasın.
+ */
+function TaskRow({ task: k, t, repo, bump, members, memberById }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const next = k.rrule && k.due_on ? nextOccurrence(k.rrule, k.due_on) : null;
+
+  const run = async (fn) => { setBusy(true); try { await fn(); bump(); } finally { setBusy(false); } };
+
+  return (
+    <>
+      <Row
+        icon={<input type="checkbox" checked={k.is_done} disabled={busy}
+          onChange={() => run(() => (k.is_done ? repo.tasks.uncomplete(k.id) : repo.tasks.complete(k.id, next)))}
+          style={{ width: 22, height: 22 }} />}
+        title={k.title} done={k.is_done}
+        sub={[memberById(k.assignee_member_id)?.display_name, k.due_on && relativeLabel(k.due_on),
+          k.rrule && '↻', k.plan_id && '🧭'].filter(Boolean).join(' · ')}
+        onClick={() => setOpen((x) => !x)}
+        end={k.points ? <span className="tag tag--ok">⭐ {k.points}</span> : null} />
+      {open && (
+        <div style={{ padding: '0 var(--sp-3) var(--sp-3)' }}>
+          {next && <div className="faint" style={{ marginBottom: 'var(--sp-2)' }}>{t('tasks.nextOn', relativeLabel(next))}</div>}
+          <div className="chips" style={{ marginBottom: 'var(--sp-2)' }}>
+            <button type="button" className="chip" disabled={busy} onClick={() => run(() => repo.tasks.postpone(k.id, 1))}>{t('tasks.postponeDay')}</button>
+            <button type="button" className="chip" disabled={busy} onClick={() => run(() => repo.tasks.postpone(k.id, 7))}>{t('tasks.postponeWeek')}</button>
+            {next && <button type="button" className="chip" disabled={busy} onClick={() => run(() => repo.tasks.skip(k.id, next))}>{t('tasks.skip')}</button>}
+          </div>
+          <Field label={t('tasks.assignee')}>
+            <select className="select" value={k.assignee_member_id || ''} disabled={busy}
+              onChange={(e) => run(() => repo.tasks.update(k.id, { assignee_member_id: e.target.value || null }))}>
+              <option value="">{t('tasks.unassigned')}</option>
+              {members.map((m) => <option key={m.id} value={m.id}>{m.avatar_emoji} {m.display_name}</option>)}
+            </select>
+          </Field>
+        </div>
+      )}
+    </>
   );
 }
