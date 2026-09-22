@@ -143,12 +143,9 @@ export default function FamilyPage() {
             {toExpense.items.map((i) => i.name).join(', ')}
           </div>
           <ExpenseForm
+            checkoutListId={toExpense.list.id}
             preset={{ merchant: toExpense.list.name, categoryId: guessGroceryCategory(categories) }}
-            onDone={async () => {
-              // Harcama kaydedildi; işaretli kalemler listeden temizlenir.
-              await repo.shopping.clearChecked(toExpense.list.id);
-              setToExpense(null); bump();
-            }} />
+            onDone={() => { setToExpense(null); bump(); }} />
         </Sheet>
       )}
       {sheet === 'occasion' && <Sheet onClose={() => setSheet(null)} title={t('family.addOccasion')}><OccasionForm t={t} onDone={() => setSheet(null)} /></Sheet>}

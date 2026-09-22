@@ -58,8 +58,8 @@ Faz tanımları `PROJECT_BLUEPRINT.md §5`.
 
 - [x] **Misafir rolü kaldırıldı** (migration 0015). Giriş yapabilen her üye artık yetişkin; "misafir para göremez" şartı yapısal olarak sağlanıyor, ajanda ve katılım kodu sızıntıları da bu yüzden kapandı — 2026-09-22
 
-- [ ] Hızlı ekleme alışverişte liste kimliği göndermiyor; liste içinden ekleme ile aynı davranmıyor
-- [ ] "Alışverişi harcamaya çevir" iki ayrı işlem — ikincisi başarısız olursa aynı alışveriş tekrar çevrilebiliyor (tek RPC olmalı)
+- [x] Hızlı eklemede liste kimliği: `shopping_add_item` RPC'si varsayılan listeyi DB'de çözüyor; Bugün ekranı, "+" menüsü ve liste içi aynı davranıyor (migration 0016) — 2026-09-22
+- [x] "Alışverişi harcamaya çevir" tek işlemde: `shopping_checkout` harcamayı yazıp işaretlileri aynı transaction'da siliyor; çift kayıt riski kapandı (migration 0016) — 2026-09-22
 - [ ] Görev oluşturma formunda tekrar seçeneği yok — altyapı var, giriş yolu yok
 - [ ] Sabah özeti bildirimi alıcı üyeye göre süzülmüyor
 - [ ] Yeniden bağlanınca kaçırılan değişiklikler için tam yenileme yok

@@ -45,7 +45,7 @@ function useLast() {
  * `txn` verilirse düzenleme kipi: alanlar dolu gelir, kaydet günceller,
  * altta iki adımlı silme çıkar.
  */
-export function ExpenseForm({ onDone, planId, txn, preset }) {
+export function ExpenseForm({ onDone, planId, txn, preset, checkoutListId }) {
   const { repo, accounts, categories, members, me, bump, baseCurrency } = useApp();
   const t = useT();
   const [last, remember] = useLast();
@@ -94,7 +94,14 @@ export function ExpenseForm({ onDone, planId, txn, preset }) {
         await repo.transactions.update(txn.id, row);
         bump(); onDone?.(`${merchant || t('money.' + kind)} · ${amount} ${currency}`);
       } else {
-        await repo.transactions.create({ ...row, paid_by_member_id: me?.id, plan_id: planId || null });
+        if (checkoutListId) {
+          // Alışverişi harcamaya çevirme: harcama ve işaretlilerin temizlenmesi
+          // tek işlemde olmalı, yoksa ikincisi patlayınca aynı alışveriş
+          // yeniden çevrilebiliyor (0016).
+          await repo.shopping.checkout(checkoutListId, row);
+        } else {
+          await repo.transactions.create({ ...row, paid_by_member_id: me?.id, plan_id: planId || null });
+        }
         remember({ accountId, categoryId });
         bump(); onDone?.(`${merchant || t('money.' + kind)} · ${amount} ${currency}`);
         setAmount(''); setMerchant('');
