@@ -5,6 +5,7 @@ import { getRepo } from '../lib/data/index.js';
 import BottomNav from './BottomNav.jsx';
 import QuickAdd from './QuickAdd.jsx';
 import { useT, useLocale, LanguageSwitch } from '../lib/i18n/context.jsx';
+import { fmtDay, fmtTime } from '../lib/dates.js';
 
 const AppCtx = createContext(null);
 export const useApp = () => useContext(AppCtx);
@@ -143,7 +144,15 @@ export default function AppShell({ children }) {
               <strong>{t('sync.offline')}</strong> — {t('sync.offlineHint')}
             </div>
           )}
-          {!isAuthPage && online && repo.mode === 'supabase' && channel !== 'SUBSCRIBED' && (
+          {/* Sunucuya ulaşılamadığı için önbellekten okundu. Çevrimdışı şeridiyle
+              birlikte de çıkabilir: o şerit yazmanın engelli olduğunu,
+              bu şerit görünen bilginin eski olduğunu söyler. */}
+          {!isAuthPage && state.stale && (
+            <div className="banner banner--danger">
+              <strong>{t('sync.stale')}</strong> — {t('sync.staleHint', `${fmtDay(String(state.stale).slice(0, 10))} ${fmtTime(state.stale)}`)}
+            </div>
+          )}
+          {!isAuthPage && online && !state.stale && repo.mode === 'supabase' && channel !== 'SUBSCRIBED' && (
             <div className="banner">
               <strong>{t('sync.reconnecting')}</strong> — {t('sync.reconnectingHint')}
             </div>

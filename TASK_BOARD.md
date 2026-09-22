@@ -69,7 +69,8 @@ Faz tanımları `PROJECT_BLUEPRINT.md §5`.
 - [x] Yedekten geri yükleme (migration 0018). Geri yükleme HİÇBİR ŞEYİN üzerine yazmaz: yedek yeni bir hane olarak açılır, mevcut hane olduğu gibi kalır. Sütunlar elle yazılmıyor; `jsonb_populate_record` ile tablonun kendi satır tipine çevriliyor, yalnızca kimlik ve bağlantılar üzerine yazılıyor. Kur yedekteki gibi donmuş kalıyor. Ayarlar'a hane değiştirme kartı da eklendi — onsuz geri yükleme tek yönlü bir kapı olurdu — 2026-09-22
 - [x] **Hata düzeltme:** `rotate_join_code` (0015) çalışma anında patlıyordu — `gen_random_bytes` `extensions` şemasında, fonksiyonun search_path'i ise yalnızca `public` idi. Ayarlar'daki "Yeni kod üret" düğmesi her seferinde hata veriyordu. Geri yüklemeyi denerken ortaya çıktı — 2026-09-22
 - [ ] Kritik akışlar test dışı: işlem düzenleme/silme, belge süresi hatırlatması
-- [ ] Gerçek çevrimdışı veri katmanı (service worker kabuğu var, veri yok)
+- [x] Çevrimdışı OKUMA katmanı: `app_bootstrap` ve `today_snapshot` yanıtları kullanıcı başına önbelleğe yazılıyor; sunucuya ulaşılamazsa son hâl gösteriliyor ve üstte ne zaman alındığını söyleyen bir şerit çıkıyor. Yetki hatasında önbelleğe DÜŞÜLMÜYOR (yoksa kullanıcı görmemesi gereken veriyi görmeye devam ederdi). Çıkışta önbellek siliniyor — 2026-09-22
+- [ ] Çevrimdışı YAZMA kuyruğu — **bilerek yapılmadı.** İş mantığı veritabanında (tetikleyici, RPC, RLS); sonradan oynatılan bir kuyruk iki kişi aynı anda dokunduğunda çakışır ve parada sessizce çift kayıt üretir. Yarım çalışan kuyruk hiç olmamasından kötü: kullanıcı kaydettiğini sanır. Yazma hâlâ engelli ve bu açıkça söyleniyor. Gerçekten gerekirse ayrı bir iş olarak, çakışma kuralları önce kararlaştırılarak yapılmalı
 
 - [x] Supabase projesi `yuva` (sa-east-1) açıldı; 0001a/0001b/0002/0003 uygulandı; kurlar tohumlandı — 2026-09-21
 - [x] `account_balances` view'i `security_invoker` yapıldı (RLS'i atlıyordu) — 2026-09-21

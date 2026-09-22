@@ -304,3 +304,12 @@ Tüm tablolar `household_id` taşır; RLS `is_household_member(household_id)`
   oturum bayrağı tetikleyiciye dondurulmuş değerleri koruttuyor. Bayrağı
   yalnızca `import_household` açabiliyor; istemci PostgREST üzerinden oturum
   değişkeni ayarlayamıyor.
+- 2026-09-22 — **Çevrimdışı: okuma var, yazma kuyruğu yok.** Son görülen
+  açılış ve Bugün verisi kullanıcı başına önbelleğe yazılır; sunucuya
+  ulaşılamazsa o gösterilir ve şerit bilginin ne zaman alındığını söyler.
+  Yazma kuyruğu bilerek yapılmadı: iş mantığı veritabanında olduğu için
+  sonradan oynatılan yazmalar çakışır ve parada sessizce çift kayıt üretir;
+  yarım çalışan bir kuyruk, kullanıcıya kaydettiğini sandırdığı için hiç
+  olmamasından kötüdür. İki ayrım önemli: önbelleğe yalnızca AĞ hatasında
+  düşülür (yetki hatasında düşmek, kullanıcının artık görmemesi gereken
+  veriyi görmesi demekti) ve çıkışta önbellek silinir.
