@@ -50,6 +50,21 @@ Faz tanımları `PROJECT_BLUEPRINT.md §5`.
 - [x] Tam yedek: `export_household` RPC (migration 0012), Ayarlar'da tek düğmeyle 19 bölümlük JSON iniyor; tarayıcıda uçtan uca denendi (118 kayıt) — 2026-09-22
 - [ ] Yedekten geri yükleme (`import_household`) — yedek formatı `yuva-backup-1` bunun için sürümlendi
 - [x] Bağlantı durumu şeridi: çevrimdışıyken ve Realtime kanalı kopukken uyarı çıkıyor, sağlıklıyken hiçbir şey gösterilmiyor; tarayıcıda çevrimdışı simüle edilerek denendi — 2026-09-22
+- [x] Bildirim merkezi + sabah özeti: `post_morning_digest` her sabah 07:00'de (Santiago) günün özetini yazıyor — söyleyecek bir şey yoksa bildirim üretmiyor; Bugün'de geçmiş listesi ve "tümünü okundu işaretle" (migration 0013) — 2026-09-22
+- [x] **Hata düzeltme:** tekrarlayan görevde "Geri al" vadeyi geri almıyordu; görev gelecek haftaya kaçmış kalıyordu. Tamamlama kaydı artık önceki vadeyi saklıyor (migration 0014) — 2026-09-22
+- [x] **Hata düzeltme:** aylık görev 31 Ocak → 28 Şubat'tan sonra 28'e takılıp kalıyordu. `BYMONTHDAY` çapası eklendi; `-1` "ayın son günü" — 2026-09-22
+
+### Dış incelemenin açık bıraktıkları (2026-09-22, ikinci tur — 7/10)
+
+- [ ] Hızlı ekleme alışverişte liste kimliği göndermiyor; liste içinden ekleme ile aynı davranmıyor
+- [ ] "Alışverişi harcamaya çevir" iki ayrı işlem — ikincisi başarısız olursa aynı alışveriş tekrar çevrilebiliyor (tek RPC olmalı)
+- [ ] Görev oluşturma formunda tekrar seçeneği yok — altyapı var, giriş yolu yok
+- [ ] `upcoming_agenda` misafire düzenli ödeme tutarlarını döndürüyor
+- [ ] `households` okuma politikası `join_code` kolonunu ayrıca korumuyor
+- [ ] Sabah özeti bildirimi alıcı üyeye göre süzülmüyor
+- [ ] Yeniden bağlanınca kaçırılan değişiklikler için tam yenileme yok
+- [ ] Plan düzenleme (tarih/başlık/durum/bütçe) ve hedefe katkı ekleme ekranı yok
+- [ ] Kritik akışlar test dışı: görev geri alma, misafir erişimi, alışveriş kaydı
 - [ ] Gerçek çevrimdışı veri katmanı (service worker kabuğu var, veri yok)
 
 - [x] Supabase projesi `yuva` (sa-east-1) açıldı; 0001a/0001b/0002/0003 uygulandı; kurlar tohumlandı — 2026-09-21

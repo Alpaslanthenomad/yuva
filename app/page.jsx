@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useApp } from '../components/AppShell.jsx';
-import { Card, Row, Money, Bar, Avatars, Empty } from '../components/ui.jsx';
+import { Card, Row, Money, Bar, Avatars, Empty, Sheet } from '../components/ui.jsx';
 import { ShoppingForm } from '../components/QuickAdd.jsx';
 import { useT } from '../lib/i18n/context.jsx';
 import { today, periodOf, fmtDayLong, fmtTime, relativeLabel, weekDays, dowNames, fromISODate, fmtDay, nextOccurrence, daysBetween, dayInRange } from '../lib/dates.js';
@@ -18,6 +18,7 @@ export default function TodayPage() {
   // kullanıcı işaretlediğini teyit edemiyordu. Bu tur için ekranda tutulur.
   const [justDone, setJustDone] = useState([]);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [history, setHistory] = useState(false);
   const T = today();
 
   useEffect(() => {
@@ -124,6 +125,8 @@ export default function TodayPage() {
       </Card>
       )}
 
+      {history && <NotifHistory t={t} repo={repo} onClose={() => setHistory(false)} />}
+
       {/* SIRADAKİ 7 GÜN — bugünden sonrası. Belge ve vadeler Bekleyen'e taşındı. */}
       <Card title={t('today.next7')} action={<Link className="faint" href="/takvim/">{t('common.seeAll')} →</Link>}>
         <div className="week-strip">
@@ -157,10 +160,16 @@ export default function TodayPage() {
         <Row icon="🔔" title={t('today.notifCount', notifs.length)}
           onClick={() => setNotifOpen((x) => !x)}
           end={<span className="faint">{notifOpen ? '▲' : '▼'}</span>} />
-        {notifOpen && notifs.map((n) => (
-          <Row key={n.id} wrap title={n.title} sub={n.body}
-            end={<button className="btn btn--ghost btn--sm" onClick={async () => { await repo.notifications.markRead(n.id); bump(); }}>✓</button>} />
-        ))}
+        {notifOpen && (<>
+          {notifs.map((n) => (
+            <Row key={n.id} wrap title={n.title} sub={n.body}
+              end={<button className="btn btn--ghost btn--sm" onClick={async () => { await repo.notifications.markRead(n.id); bump(); }}>✓</button>} />
+          ))}
+          <div className="inline" style={{ marginTop: 'var(--sp-2)' }}>
+            <button className="btn btn--ghost btn--sm" onClick={() => setHistory(true)}>{t('today.allNotifs')}</button>
+            <button className="btn btn--ghost btn--sm" onClick={async () => { await repo.notifications.markAllRead(); bump(); }}>{t('today.markAllRead')}</button>
+          </div>
+        </>)}
       </Card>
       )}
 
@@ -241,6 +250,22 @@ function TaskLine({ task: k, t, repo, bump, memberById, overdueFrom, onDone }) {
         {late > 0 && <span className="tag tag--danger">!</span>}
         {k.points ? <span className="tag tag--ok">⭐ {k.points}</span> : null}
       </>} />
+  );
+}
+
+/** Bildirim geçmişi: okunmuşlar dahil son 50 kayıt (sabah özetleri burada birikir). */
+function NotifHistory({ t, repo, onClose }) {
+  const [rows, setRows] = useState(null);
+  useEffect(() => { repo.notifications.list({ all: true, limit: 50 }).then(setRows); }, [repo]);
+  return (
+    <Sheet onClose={onClose} title={t('common.notifications')}>
+      {rows === null ? <Empty>{t('common.loading')}</Empty>
+        : rows.length === 0 ? <Empty>{t('today.noNotifs')}</Empty>
+        : rows.map((n) => (
+          <Row key={n.id} wrap title={n.title} sub={[n.body, relativeLabel(String(n.fire_at).slice(0, 10))].filter(Boolean).join(' · ')}
+            done={Boolean(n.read_at)} />
+        ))}
+    </Sheet>
   );
 }
 

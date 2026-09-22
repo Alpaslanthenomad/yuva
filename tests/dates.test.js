@@ -109,3 +109,16 @@ test('dayInRange: plan aralığında kaçıncı gün', () => {
   assert.deepEqual(dayInRange('2026-10-01', '2026-10-01', null), { day: 1, total: 1 });
   assert.equal(dayInRange('2026-10-01', null, null), null);
 });
+
+test('expandRRule BYMONTHDAY: çapa kuralda, ay sonuna takılıp kalmaz', () => {
+  // Hata: 31 Ocak → 28 Şubat'a kırpılınca çapa 28'e düşüyor ve görev bir daha
+  // 31'e dönmüyordu. BYMONTHDAY çapayı sabitler.
+  assert.equal(nextOccurrence('FREQ=MONTHLY;BYMONTHDAY=31', '2026-01-31'), '2026-02-28');
+  assert.equal(nextOccurrence('FREQ=MONTHLY;BYMONTHDAY=31', '2026-02-28'), '2026-03-31');
+  assert.equal(nextOccurrence('FREQ=MONTHLY;BYMONTHDAY=31', '2026-04-30'), '2026-05-31');
+});
+test('expandRRule BYMONTHDAY=-1: ayın son günü', () => {
+  assert.equal(nextOccurrence('FREQ=MONTHLY;BYMONTHDAY=-1', '2026-01-31'), '2026-02-28');
+  assert.equal(nextOccurrence('FREQ=MONTHLY;BYMONTHDAY=-1', '2026-02-28'), '2026-03-31');
+  assert.equal(nextOccurrence('FREQ=MONTHLY;BYMONTHDAY=-1', '2026-11-30'), '2026-12-31');
+});
