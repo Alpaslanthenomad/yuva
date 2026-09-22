@@ -69,7 +69,7 @@ Faz tanımları `PROJECT_BLUEPRINT.md §5`.
 - [ ] `supabaseRepo` kalan contract metodlarını gerçek sorgularla doldur
 - [ ] Takvim: hafta görünümü sürükle-kaydır; RRULE düzenleme UI; çakışma uyarısı
 - [ ] Para: işlem düzenleme/silme; filtre (ay/üye/kategori/hesap); rapor grafikleri
-- [ ] Para: düzenli kurallar → `post_due_recurring` için Supabase cron (pg_cron) kurulumu
+- [x] Para: pg_cron her gün 12:00 UTC (≈ Santiago 09:00) `post_due_recurring` çalıştırıyor; fonksiyon artık gecikmiş dönemleri tek seferde yakalıyor, otomatik giderde her dönem için ayrı işlem yazıyor (migration 0011) — 2026-09-22
 - [ ] Bütçe ekranı: kategori bazlı aylık zarflar + %80/%100 uyarısı
 - [ ] Alışveriş: "işaretlileri harcamaya çevir"
 - [ ] Planlar: seyahat detay (itinerary + rezervasyon + bavul listesi + bütçe vs gerçek)
