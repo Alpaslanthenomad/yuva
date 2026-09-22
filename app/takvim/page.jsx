@@ -132,10 +132,23 @@ export default function CalendarPage() {
               {confirming ? (
                 <>
                   <div className="faint" style={{ marginBottom: 'var(--sp-2)' }}>{t('common.confirmDelete', open.title)}</div>
-                  <div className="grid-2">
-                    <button className="btn btn--ghost" onClick={() => setConfirming(false)}>{t('common.cancel')}</button>
-                    <button className="btn btn--danger" onClick={async () => { await repo.events.remove(open.id); setOpen(null); setConfirming(false); bump(); }}>{t('common.yesDelete')}</button>
-                  </div>
+                  {/* Tekrarlayan olayda tek günü atlamak seriyi silmez, o tarihi exdates'e yazar (0008). */}
+                  {open.rrule ? (
+                    <>
+                      <div className="grid-2">
+                        <button className="btn btn--danger" onClick={async () => { await repo.events.skipOccurrence(open.id, open.date); setOpen(null); setConfirming(false); bump(); }}>{t('calendar.deleteThisOne')}</button>
+                        <button className="btn btn--danger" onClick={async () => { await repo.events.remove(open.id); setOpen(null); setConfirming(false); bump(); }}>{t('calendar.deleteSeries')}</button>
+                      </div>
+                      <div className="faint" style={{ marginTop: 'var(--sp-2)' }}>{t('calendar.skippedHint')}</div>
+                      <div className="spacer" />
+                      <button className="btn btn--ghost btn--block" onClick={() => setConfirming(false)}>{t('common.cancel')}</button>
+                    </>
+                  ) : (
+                    <div className="grid-2">
+                      <button className="btn btn--ghost" onClick={() => setConfirming(false)}>{t('common.cancel')}</button>
+                      <button className="btn btn--danger" onClick={async () => { await repo.events.remove(open.id); setOpen(null); setConfirming(false); bump(); }}>{t('common.yesDelete')}</button>
+                    </div>
+                  )}
                 </>
               ) : (
                 <button className="btn btn--danger btn--block" onClick={() => setConfirming(true)}>{t('common.delete')}</button>

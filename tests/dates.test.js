@@ -66,3 +66,13 @@ test('easter ve tatiller', () => {
   assert.equal(map['2026-01-01'].length, 2); // iki ülkede de yılbaşı
   assert.equal(holidayMap(2026, ['TR'])['2026-09-18'], undefined);
 });
+
+test('expandRRule exdate: tek gün atlanır, seri bozulmaz', () => {
+  // 23 Eylül Çarşamba haftalık; 7 Ekim atlanmış olsun.
+  const r = expandRRule('FREQ=WEEKLY', '2026-09-23', '2026-09-23', '2026-10-20', ['2026-10-07']);
+  assert.deepEqual(r, ['2026-09-23', '2026-09-30', '2026-10-14']);
+});
+test('expandRRule exdate BYDAY ile de çalışır', () => {
+  const r = expandRRule('FREQ=WEEKLY;BYDAY=MO,TH', '2026-09-14', '2026-09-14', '2026-09-27', ['2026-09-17', '2026-09-21']);
+  assert.deepEqual(r, ['2026-09-14', '2026-09-24']);
+});

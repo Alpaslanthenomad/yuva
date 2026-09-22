@@ -41,8 +41,8 @@ Faz tanımları `PROJECT_BLUEPRINT.md §5`.
 - [x] Migration 0006 canlı veritabanına uygulandı ve doğrulandı — 2026-09-21
 - [x] Migration 0007 yazıldı: finansal tablolarda okuma yalnızca yetişkine; month_summary/budget_status/today_snapshot/app_bootstrap aynı sınırı uyguluyor; app_bootstrap hesapları ve katılım kodunu artık misafire vermiyor — 2026-09-21
 - [x] Katılım kodu sertleştirildi: süre + kullanım hakkı + hangi rolle katılınacağı; `rotate_join_code` RPC ve Ayarlar'da 'Yeni kod üret' — 2026-09-21
-- [ ] **Migration 0007 canlı veritabanına uygulanacak** (Supabase SQL Editor)
-- [ ] Tekrarlayan olayda tek bir günü silme (exdate) — şu an tüm seri siliniyor
+- [x] Migration 0007 canlı veritabanına uygulandı ve doğrulandı; hane kodu `6C69FFC6` rol=adult · 1 kullanım · 2026-10-22'ye kadar geçerli — 2026-09-21
+- [x] Tekrarlayan olayda tek günü atlama: migration 0008 (`event_skip_occurrence`), Takvim'de "Yalnızca bu gün" / "Tüm seri" seçimi; canlıya uygulandı — 2026-09-21
 - [ ] Cihazlar arası canlı yenileme (Supabase Realtime)
 
 - [x] Supabase projesi `yuva` (sa-east-1) açıldı; 0001a/0001b/0002/0003 uygulandı; kurlar tohumlandı — 2026-09-21
