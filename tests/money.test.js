@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseAmount, formatMoney, convert, budgetState, minorToDecimal } from '../lib/money.js';
+import { parseAmount, formatMoney, convert, budgetState, minorToDecimal, planTotals } from '../lib/money.js';
 
 test('parseAmount CLP: binlik nokta, ondalık yok', () => {
   assert.equal(parseAmount('12.345', 'CLP'), 12345);
@@ -41,4 +41,28 @@ test('budgetState eşikleri', () => {
   assert.equal(budgetState(120, 100).state, 'over');
   assert.equal(budgetState(120, 100).pct, 100);
   assert.equal(budgetState(10, 0).state, 'none');
+});
+
+test('planTotals: yalnızca giderler sayılır, gelir ve transfer sayılmaz', () => {
+  const txns = [
+    { kind: 'expense', amount: 100, currency: 'USD', amount_base: 94000 },
+    { kind: 'expense', amount: 50, currency: 'USD', amount_base: 46000 },
+    { kind: 'income', amount: 900, currency: 'USD', amount_base: 850000 },
+    { kind: 'transfer', amount: 200, currency: 'USD', amount_base: 190000 },
+  ];
+  assert.equal(planTotals(txns, [], 'CLP', 'CLP', {}).spent, 140000);
+});
+
+test('planTotals: dondurulmuş amount_base kullanılır, güncel kurla hesaplanmaz', () => {
+  // İşlem 940 kurundan yazılmış; kur bugün 1200 olsa bile toplam değişmez.
+  const txns = [{ kind: 'expense', amount: 100, currency: 'USD', amount_base: 94000 }];
+  const bugunkuKurlar = { USDCLP: 1200 };
+  assert.equal(planTotals(txns, [], 'CLP', 'CLP', bugunkuKurlar).spent, 94000);
+});
+
+test('planTotals: hedef katkıları ve plan para birimine çevrim', () => {
+  const contribs = [{ amount: 5400, currency: 'USD', amount_base: 5076000 }];
+  const r = planTotals([], contribs, 'CLP', 'USD', { USDCLP: 940 });
+  assert.equal(r.contributed, 5400);
+  assert.equal(r.spent, 0);
 });

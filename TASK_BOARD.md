@@ -32,6 +32,17 @@ Faz tanımları `PROJECT_BLUEPRINT.md §5`.
 
 ## Faz 1 — MVP (Şimdi)
 
+### Doğruluk düzeltmeleri (dış inceleme sonrası) — 2026-09-21
+
+- [x] `expandRRule`: BYDAY'siz haftalık tekrar hafta başına kayıyordu (Çarşamba → Pazartesi); artık kendi gününde tekrar ediyor — 2026-09-21
+- [x] Depo kökündeki 37 mükerrer dosya kaldırıldı — 2026-09-21
+- [x] Migration 0006 yazıldı: toplam bütçe harcaması, bütçe tekilliği, sabit/değişken gider, katkılarda dondurulmuş kur, `budget_set` RPC — 2026-09-21
+- [x] `planTotals`: plan harcaması yalnızca giderlerden ve dondurulmuş `amount_base` ile hesaplanıyor (gelir/transfer artık sayılmıyor) — 2026-09-21
+- [ ] **Migration 0006 canlı veritabanına uygulanacak** (Supabase SQL Editor)
+- [ ] Rol/gizlilik: misafir finansal tabloları okuyabiliyor; katılım kodunun süresi ve tek kullanım sınırı yok → migration 0007
+- [ ] Tekrarlayan olayda tek bir günü silme (exdate) — şu an tüm seri siliniyor
+- [ ] Cihazlar arası canlı yenileme (Supabase Realtime)
+
 - [x] Supabase projesi `yuva` (sa-east-1) açıldı; 0001a/0001b/0002/0003 uygulandı; kurlar tohumlandı — 2026-09-21
 - [x] `account_balances` view'i `security_invoker` yapıldı (RLS'i atlıyordu) — 2026-09-21
 - [x] `budget_status` içindeki hatalı virgüllü JOIN düzeltildi (derlenmiyordu) — 2026-09-21

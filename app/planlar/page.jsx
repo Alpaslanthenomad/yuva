@@ -5,7 +5,7 @@ import { Card, Row, Bar, Chips, Empty, Sheet, Field } from '../../components/ui.
 import { ExpenseForm, TaskForm } from '../../components/QuickAdd.jsx';
 import { useT } from '../../lib/i18n/context.jsx';
 import { today, daysBetween, fmtDay } from '../../lib/dates.js';
-import { formatMoney, convert, budgetState, parseAmount, minorToDecimal, CURRENCY_CODES } from '../../lib/money.js';
+import { formatMoney, budgetState, parseAmount, minorToDecimal, planTotals, CURRENCY_CODES } from '../../lib/money.js';
 
 const KINDS = ['trip', 'gathering', 'project', 'goal'];
 const ICONS = { trip: '✈️', gathering: '🎉', project: '🔨', goal: '🎯' };
@@ -50,9 +50,8 @@ function usePlanNumbers(plan, repo, tick, baseCurrency, rates) {
         plan.kind === 'goal' && repo.plans.contributions ? repo.plans.contributions(plan.id) : Promise.resolve([]),
       ]);
       const cur = plan.budget_currency || baseCurrency;
-      const actual = txns.reduce((s, x) => s + (convert(Number(x.amount), x.currency, cur, rates) ?? 0), 0);
-      const contribTotal = contrib.reduce((s, g) => s + (convert(Number(g.amount), g.currency, cur, rates) ?? 0), 0);
-      setN({ actual, items, contrib: contribTotal });
+      const { spent, contributed } = planTotals(txns, contrib, baseCurrency, cur, rates);
+      setN({ actual: spent, items, contrib: contributed });
     })();
   }, [plan, repo, tick, baseCurrency, rates]);
   return n;
