@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../../components/AppShell.jsx';
 import { Card, Row, Field, Empty } from '../../components/ui.jsx';
 import { useT, useLocale, LanguageSwitch } from '../../lib/i18n/context.jsx';
@@ -106,12 +106,15 @@ export default function SettingsPage() {
         </button>
         <div className="faint" style={{ margin: 'var(--sp-2) 0 var(--sp-3)' }}>{t('settings.backupHint')}</div>
         {backupMsg !== null && <div className="banner">{t('settings.backupDone', backupMsg)}</div>}
+        {repo.mode === 'supabase' && <RestoreRow t={t} repo={repo} />}
         <div className="inline">
           <button className="btn btn--outline btn--sm" onClick={() => exportCsv(repo)}>{t('settings.exportCsv')}</button>
           {repo.mode === 'demo' && <button className="btn btn--outline btn--sm" onClick={() => { repo.reset(); location.reload(); }}>{t('settings.resetDemo')}</button>}
           {repo.mode === 'supabase' && <button className="btn btn--danger btn--sm" onClick={async () => { await repo.auth.signOut(); location.href = '/giris/'; }}>{t('settings.signOut')}</button>}
         </div>
       </Card>
+
+      {repo.mode === 'supabase' && <HouseholdSwitch t={t} repo={repo} current={household.id} />}
 
       <Card title={t('settings.connect')} className="card--flat">
         <p className="faint">{repo.mode === 'supabase' ? t('settings.connectedHint') : t('settings.demoHint')}</p>
@@ -156,6 +159,75 @@ function PasswordCard({ t, repo }) {
  * belgeler ve alışveriş hiçbir yere çıkmıyordu.
  * @returns {Promise<number>} indirilen kayıt sayısı
  */
+/**
+ * Yedekten geri yükleme. Dosya seçilir, biçimi doğrulanır, onay alınır.
+ * Geri yükleme yeni bir hane kurar (0018) — bu yüzden bitince sayfa yenilenir,
+ * uygulama yeni haneyle açılsın diye.
+ */
+function RestoreRow({ t, repo }) {
+  const fileRef = useRef(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const [err, setErr] = useState('');
+
+  const pick = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';          // aynı dosya tekrar seçilebilsin
+    if (!file) return;
+    setErr(''); setMsg(null);
+    let data;
+    try { data = JSON.parse(await file.text()); } catch { setErr(t('settings.restoreBadFile')); return; }
+    if (data?.format !== 'yuva-backup-1' || !data.household) { setErr(t('settings.restoreBadFile')); return; }
+    if (!window.confirm(t('settings.restoreConfirm'))) return;
+    setBusy(true);
+    try {
+      const res = await repo.backup.importAll(data);
+      const n = Object.entries(res).reduce((a, [k, v]) => a + (k === 'household_id' ? 0 : Number(v) || 0), 0);
+      setMsg(n);
+      setTimeout(() => location.reload(), 1500);
+    } catch (ex) { setErr(ex.message); } finally { setBusy(false); }
+  };
+
+  return (
+    <div style={{ marginBottom: 'var(--sp-3)' }}>
+      <input ref={fileRef} type="file" accept="application/json,.json" onChange={pick} style={{ display: 'none' }} />
+      <button className="btn btn--outline btn--block" disabled={busy} onClick={() => fileRef.current?.click()}>
+        {busy ? t('settings.restoring') : t('settings.restore')}
+      </button>
+      <div className="faint" style={{ marginTop: 'var(--sp-2)' }}>{t('settings.restoreHint')}</div>
+      {msg !== null && <div className="banner">{t('settings.restoreDone', msg)}</div>}
+      {err && <div className="banner banner--danger">{err}</div>}
+    </div>
+  );
+}
+
+/**
+ * Hane değiştirme. Yalnızca birden fazla hane varsa çizilir — tek haneliyken
+ * anlamsız bir kart olurdu. Geri yükleme bu kart olmadan tek yönlü bir kapı
+ * olurdu: yeni haneye geçip eskiye dönememek.
+ */
+function HouseholdSwitch({ t, repo, current }) {
+  const [rows, setRows] = useState(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { repo.household.list().then(setRows).catch(() => setRows([])); }, [repo]);
+  if (!rows || rows.length < 2) return null;
+  const go = async (id) => {
+    setBusy(true);
+    try { await repo.household.setDefault(id); location.reload(); } finally { setBusy(false); }
+  };
+  return (
+    <Card title={t('settings.households')}>
+      {rows.map((h) => (
+        <Row key={h.id} icon="🏠" title={h.name} sub={`${h.base_currency} · ${h.members}`}
+          end={h.id === current
+            ? <span className="tag tag--ok">{t('settings.current')}</span>
+            : <button className="btn btn--sm btn--outline" disabled={busy} onClick={() => go(h.id)}>{t('settings.switchTo')}</button>} />
+      ))}
+      <div className="faint" style={{ marginTop: 'var(--sp-2)' }}>{t('settings.householdsHint')}</div>
+    </Card>
+  );
+}
+
 async function exportBackup(repo) {
   const data = await repo.backup.exportAll();
   const count = Object.values(data).reduce((n, v) => n + (Array.isArray(v) ? v.length : 0), 0);

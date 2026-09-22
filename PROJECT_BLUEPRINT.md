@@ -289,3 +289,18 @@ Tüm tablolar `household_id` taşır; RLS `is_household_member(household_id)`
   eksik olan yazan taraftı. Katılımcısı yazılmamış olay ve kimseye atanmamış iş
   **herkese** sayılır — aksi halde hanenin ortak işleri kimsenin özetine
   girmezdi.
+- 2026-09-22 — **Geri yükleme üzerine yazmaz** (0018). Yedek her zaman YENİ bir
+  hane olarak açılır; mevcut haneye birleştirme de silme de yok. Gerekçe: yanlış
+  dosya seçmenin bedeli en fazla fazladan bir hane olmalı, veri kaybı değil.
+  Bunun bedeli, kullanıcının iki haneli kalabilmesi — o yüzden Ayarlar'a hane
+  değiştirme kartı eklendi; onsuz geri yükleme tek yönlü bir kapı olurdu.
+  Sütunlar elle yazılmıyor: `jsonb_populate_record` yedeği tablonun kendi satır
+  tipine çeviriyor, yalnızca kimlikler ve bağlantılar üzerine yazılıyor —
+  19 tablo × ~15 sütunu elle saymak, şemaya sonradan eklenen bir sütunun
+  yedeğe girip geri gelmemesi demekti.
+- 2026-09-22 — **Geri yüklemede kur yeniden hesaplanmaz.** Tetikleyici normalde
+  her INSERT'te kuru tazeler ve o tarihte kur yoksa hata verir; bu yüzden eski
+  bir yedek hiç yüklenemezdi. Geri yükleme boyunca `set local` ile açılan bir
+  oturum bayrağı tetikleyiciye dondurulmuş değerleri koruttuyor. Bayrağı
+  yalnızca `import_household` açabiliyor; istemci PostgREST üzerinden oturum
+  değişkeni ayarlayamıyor.
