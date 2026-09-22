@@ -268,3 +268,24 @@ Tüm tablolar `household_id` taşır; RLS `is_household_member(household_id)`
   silinen satır diğer cihazda ekranda kalıyordu. Olaylar 400 ms'de tek
   yenilemeye indirilir; hane/üye/hesap/kategori değişince kabuk verisi de
   yeniden yüklenir.
+- 2026-09-22 — **Tekrar kuralı vadeye çapalanır** (`buildRRule`, lib/dates.js).
+  Görev formuna tekrar seçeneği eklenirken karar: "her ay" seçilince kurala
+  `BYMONTHDAY` yazılır. Gerekçe, olay ile görevin farklı çalışması: olay serisi
+  her seferinde kendi başlangıç tarihinden açılır, görev ise her tamamlanışta
+  **yeni vadesinden** devam eder. Çapa kuralda olmazsa 31 Ocak → 28 Şubat'a
+  kırpılınca seri kalıcı olarak 28'e düşer. Olay formu da aynı yardımcıyı
+  kullanıyor — iki ayrı tekrar mantığı taşımamak için.
+- 2026-09-22 — **Tekrarlayan görevde geri alma ayrı bir eylem.** Onay kutusu
+  tekrarlayan görevde bitmiş göstermez (görev bitmez, vadesi taşınır), bu yüzden
+  ikinci tıklama geri alma değil ikinci bir tamamlama oluyordu. Geri alma satır
+  altında açık bir düğme; "kutuyu tekrar tıkla" davranışı kasıtlı olarak yok.
+- 2026-09-22 — **Kaçırılan değişiklikler için tam yenileme.** Realtime yalnızca
+  kanal açıkken duyar; uyuyan telefonda veya arka plandaki sekmede olan biten
+  geri dönünce kendiliğinden gelmiyordu. Kanal yeniden kurulduğunda ve
+  çevrimdışından dönüşte zorunlu, sekmeye dönüşte 15 sn eşiğiyle yeniden
+  yükleme yapılır. Eşik olmasa her sekme değişiminde sunucuya gidilirdi.
+- 2026-09-22 — **Sabah özeti kişiye özel** (0017). Bildirim tablosu ve RLS
+  bunu 0001'den beri destekliyordu (`member_id` dolu = yalnızca o üye görür);
+  eksik olan yazan taraftı. Katılımcısı yazılmamış olay ve kimseye atanmamış iş
+  **herkese** sayılır — aksi halde hanenin ortak işleri kimsenin özetine
+  girmezdi.

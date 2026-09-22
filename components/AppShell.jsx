@@ -1,5 +1,5 @@
 'use client';
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { getRepo } from '../lib/data/index.js';
 import BottomNav from './BottomNav.jsx';
@@ -23,6 +23,11 @@ export default function AppShell({ children }) {
   const [online, setOnline] = useState(true);
   const [channel, setChannel] = useState('SUBSCRIBED');
 
+  // Son başarılı yenilemenin zamanı. Kaçırılan değişiklikleri yakalamak için
+  // kullanılır (aşağıdaki resync); sekmeye her dönüşte sunucuya gitmeyelim diye
+  // eşik var.
+  const lastSyncRef = useRef(0);
+
   const reload = useCallback(async () => {
     try {
       const base = await repo.init();
@@ -34,6 +39,7 @@ export default function AppShell({ children }) {
         ? [base.accounts, base.categories, base.rates]
         : await Promise.all([repo.accounts.list(), repo.categories.list(), repo.fx.rates()]);
       setState({ ...base, accounts, categories, rates, loading: false });
+      lastSyncRef.current = Date.now();
       return base;   // çağıran (giriş ekranı) haneyi görüp görmediğini bilsin
     } catch (e) {
       console.error(e);
@@ -44,14 +50,39 @@ export default function AppShell({ children }) {
 
   useEffect(() => { reload(); }, [reload]);
 
+  /**
+   * Kaçırılanları yakala. Canlı yenileme yalnızca kanal AÇIKKEN gelen olayları
+   * duyar; kanal kapalıyken (uyuyan telefon, tünelden geçen tren, arka plana
+   * atılmış sekme) yapılan değişiklikler geri dönünce KENDİLİĞİNDEN gelmez —
+   * ekran sessizce eskimiş kalıyordu. Bağlantı/sekme geri geldiğinde tam
+   * yenileme yapılır. `force` kanal yeniden kurulduğunda kullanılır; sekme
+   * değiştirmede eşik aranır, her sekme dönüşünde sunucuya gitmeyelim.
+   */
+  const RESYNC_MS = 15000;
+  const resync = useCallback((force = false) => {
+    if (!force && Date.now() - lastSyncRef.current < RESYNC_MS) return;
+    reload();
+    setTick((x) => x + 1);
+  }, [reload]);
+
   useEffect(() => {
     if (typeof navigator === 'undefined') return;
-    const sync = () => setOnline(navigator.onLine);
-    sync();
+    const sync = () => {
+      const on = navigator.onLine;
+      setOnline(on);
+      if (on) resync(true);   // çevrimdışıyken hiçbir şey duymadık
+    };
+    setOnline(navigator.onLine);
+    const onVisible = () => { if (document.visibilityState === 'visible') resync(); };
     window.addEventListener('online', sync);
     window.addEventListener('offline', sync);
-    return () => { window.removeEventListener('online', sync); window.removeEventListener('offline', sync); };
-  }, []);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('online', sync);
+      window.removeEventListener('offline', sync);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [resync]);
 
   // PWA service worker
   useEffect(() => {
@@ -71,15 +102,23 @@ export default function AppShell({ children }) {
     if (!hid || typeof repo.subscribe !== 'function') return;
     let timer = null;
     let deep = false;
+    // Bir kez bağlandıysak, sonraki her bağlanma "yeniden bağlanma"dır.
+    let everSubscribed = false;
     const unsub = repo.subscribe((table) => {
       if (['households', 'household_members', 'accounts', 'categories'].includes(table)) deep = true;
       clearTimeout(timer);
       timer = setTimeout(() => {
         if (deep) { deep = false; reload(); } else setTick((x) => x + 1);
       }, 400);
-    }, setChannel);
+    }, (status) => {
+      setChannel(status);
+      // Kanal koptuktan sonra yeniden kuruldu: arada olan biteni duymadık.
+      if (status !== 'SUBSCRIBED') return;
+      if (everSubscribed) resync(true);
+      everSubscribed = true;   // ilk bağlanmada zaten az önce yüklendi
+    });
     return () => { clearTimeout(timer); if (typeof unsub === 'function') unsub(); };
-  }, [repo, state.household?.id, reload]);
+  }, [repo, state.household?.id, reload, resync]);
   const value = useMemo(() => ({
     repo, ...state, tick, bump, reload, locale,
     memberById: (id) => state.members.find((m) => m.id === id),

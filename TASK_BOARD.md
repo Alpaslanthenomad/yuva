@@ -64,8 +64,8 @@ Faz tanımları `PROJECT_BLUEPRINT.md §5`.
 - [x] **Hata düzeltme:** Aile › Görevler'de tekrarlayan görevi geri almanın yolu yoktu. Görev "bitti" olmadığı için onay kutusu hemen boşalıyor, ikinci tıklama geri alma değil ikinci bir tamamlama oluyordu — vade bir tekrar daha ileri kaçıyordu. Tamamlayınca satırda "Yapıldı / Geri al" çıkıyor. `demoRepo` de `prev_due_on`'u saklayıp geri alıyor (0014 ile aynı davranış) — 2026-09-22
 - [x] Plan düzenleme: detay sayfasında ⚙️ sekmesi — başlık, yer, tarihler, bütçe/hedef, para birimi ve durum. Tür düzenlemede değişmiyor (bütçe/hedef alanı ve ikon türe bağlı) — 2026-09-22
 - [x] Hedefe katkı ekleme: hedef planlarda 🐖 sekmesi — tutar, para birimi, tarih, not; ilerleme/hedef/kalan üstte. Kur katkı anında DB'de donuyor (0006), ön yüz göndermiyor — 2026-09-22
-- [ ] Sabah özeti bildirimi alıcı üyeye göre süzülmüyor
-- [ ] Yeniden bağlanınca kaçırılan değişiklikler için tam yenileme yok
+- [x] Sabah özeti artık kişiye özel (migration 0017). Randevu = katılımcısı olduğun + katılımcısı hiç yazılmamış olaylar; iş = sana atanmış + kimseye atanmamış. Belge ve özel gün hane geneli. Yalnızca hesabı olan üyeye yazılıyor — çocuk profillerinin hesabı yok. Gerçek veritabanında geri alınan bir işlemde doğrulandı: eşin geciken işi benim sayıma girmiyor — 2026-09-22
+- [x] Yeniden bağlanınca tam yenileme: kanal koptuktan sonra yeniden kurulduğunda, çevrimdışıdan dönünce ve sekmeye geri dönünce (15 sn eşikle) kabuk verisi baştan yükleniyor. Kanal kapalıyken yapılan değişiklikler kendiliğinden gelmiyordu, ekran sessizce eskiyordu. Demo kipinde de sekmeler artık birbirini görüyor — 2026-09-22
 - [ ] Kritik akışlar test dışı: işlem düzenleme/silme, belge süresi hatırlatması
 - [ ] Gerçek çevrimdışı veri katmanı (service worker kabuğu var, veri yok)
 
