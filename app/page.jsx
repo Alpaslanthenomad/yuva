@@ -5,7 +5,7 @@ import { useApp } from '../components/AppShell.jsx';
 import { Card, Row, Money, Bar, Avatars, Empty } from '../components/ui.jsx';
 import { ShoppingForm } from '../components/QuickAdd.jsx';
 import { useT } from '../lib/i18n/context.jsx';
-import { today, periodOf, fmtDayLong, fmtTime, relativeLabel, weekDays, dowNames, fromISODate, fmtDay, nextOccurrence, daysBetween } from '../lib/dates.js';
+import { today, periodOf, fmtDayLong, fmtTime, relativeLabel, weekDays, dowNames, fromISODate, fmtDay, nextOccurrence, daysBetween, dayInRange } from '../lib/dates.js';
 import { formatMoney, budgetState, dailyAllowance } from '../lib/money.js';
 import { holidayMap } from '../lib/holidays.js';
 
@@ -25,16 +25,17 @@ export default function TodayPage() {
     (async () => {
       // Altı ayrı istek yerine tek anlık görüntü + hafta şeridi (0004_bootstrap.sql).
       const period = periodOf(T);
-      const [snap, weekEvents] = await Promise.all([
+      const [snap, weekEvents, plans] = await Promise.all([
         repo.summary.today(T, 7, period),
         repo.events.list({ from: weekDays(T)[0], to: weekDays(T)[6] }),
+        repo.plans.list(),
       ]);
-      setData({ ...snap, weekEvents });
+      setData({ ...snap, weekEvents, plans });
     })();
   }, [repo, household, tick, T]);
 
   if (!data) return <TodaySkeleton />;
-  const { agenda, month, budget, shopping, notifs, weekEvents } = data;
+  const { agenda, month, budget, shopping, notifs, weekEvents, plans } = data;
   const todays = agenda.events.filter((e) => e.date === T);
   const total = budget.find((b) => b.category_id === null);
   const bs = total ? budgetState(total.spent, total.budget) : null;
@@ -46,6 +47,11 @@ export default function TodayPage() {
   const dueTodayTasks = openTasks.filter((k) => k.due_on === T);
   const undatedTasks = openTasks.filter((k) => !k.due_on);
   const todayTasks = [...overdueTasks, ...dueTodayTasks, ...undatedTasks];
+  // Bugün bir seyahat/etkinlik sürüyorsa en üstte bağlam ver: "2. gün / 5".
+  const activePlans = (plans || [])
+    .filter((pl) => pl.kind !== 'goal' && pl.status !== 'cancelled')
+    .map((pl) => ({ plan: pl, span: dayInRange(T, pl.starts_on, pl.ends_on) }))
+    .filter((x) => x.span);
   const wd = weekDays(T);
   const DOW = dowNames();
 
@@ -70,6 +76,11 @@ export default function TodayPage() {
 
       {/* BUGÜN — açınca ilk görülen şey: bugün ne var, ne yapılacak. */}
       <Card title={t('today.todayBlock')}>
+        {activePlans.map(({ plan, span }) => (
+          <Row key={plan.id} icon={plan.icon || '🧭'} title={plan.title}
+            sub={`${t('plans.' + plan.kind)} · ${t('today.activePlan', span.day, span.total)}`}
+            end={<Link className="faint" href="/planlar/">→</Link>} />
+        ))}
         {todays.map((e) => (
           <div className="event" key={e.id + e.date}>
             <div className="event__time">{e.all_day ? t('calendar.allDay') : fmtTime(e.starts_at)}</div>
@@ -93,7 +104,7 @@ export default function TodayPage() {
               bump();
             }}>{t('today.undo')}</button>} />
         ))}
-        {todays.length === 0 && dueTodayTasks.length === 0 && undatedTasks.length === 0 && justDone.length === 0
+        {todays.length === 0 && dueTodayTasks.length === 0 && undatedTasks.length === 0 && justDone.length === 0 && activePlans.length === 0
           && <Empty>{t('today.nothingToday')}</Empty>}
       </Card>
 

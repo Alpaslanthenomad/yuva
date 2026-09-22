@@ -1,10 +1,11 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useApp } from '../../components/AppShell.jsx';
 import { Card, Seg, Chips, Avatars, Empty, Sheet, Row } from '../../components/ui.jsx';
 import { EventForm, repeatKeyOf } from '../../components/QuickAdd.jsx';
 import { useT } from '../../lib/i18n/context.jsx';
-import { today, weekDays, monthGrid, addDays, addMonths, periodOf, fmtPeriod, fmtDayLong, fmtTime, dowNames, fromISODate, overlaps } from '../../lib/dates.js';
+import { today, weekDays, monthGrid, addDays, addMonths, periodOf, fmtPeriod, fmtDayLong, fmtTime, dowNames, fromISODate, overlaps, dayInRange } from '../../lib/dates.js';
 import { holidayMap } from '../../lib/holidays.js';
 
 export default function CalendarPage() {
@@ -29,6 +30,16 @@ export default function CalendarPage() {
   }, [view, sel]);
 
   useEffect(() => { if (household) repo.events.list(range).then(setEvents); }, [repo, household, range, tick]);
+  // Planlar takvimde bant olarak görünür. Kopya olay YAZMIYORUZ: plan tarihleri
+  // değişince takvimde eski kayıt kalırdı. Tek kaynak plans tablosu.
+  const [plans, setPlans] = useState([]);
+  useEffect(() => { if (household) repo.plans.list().then(setPlans); }, [repo, household, tick]);
+  // Birikim hedefi (goal) bant olarak gösterilmez: aralığı bir birikim ufku,
+  // o gün süren bir şey değil — her güne düşüp takvimi kirletiyordu.
+  const plansOn = (d) => plans
+    .filter((pl) => pl.kind !== 'goal' && pl.status !== 'cancelled')
+    .map((pl) => ({ plan: pl, span: dayInRange(d, pl.starts_on, pl.ends_on) }))
+    .filter((x) => x.span);
 
   const holidays = holidayMap(Number(sel.slice(0, 4)), household?.holiday_countries, locale);
   const visible = events.filter((e) => filter === 'all' || (e.attendees || []).includes(filter));
@@ -82,7 +93,7 @@ export default function CalendarPage() {
               })}
             </div>
           </Card>
-          <DayList t={t} day={sel} events={byDay(sel)} holidays={holidays} memberById={memberById} conflicts={conflicts} colorOf={colorOf} onOpen={setOpen} />
+          <DayList t={t} day={sel} events={byDay(sel)} holidays={holidays} memberById={memberById} conflicts={conflicts} colorOf={colorOf} onOpen={setOpen} plans={plansOn(sel)} />
         </>
       )}
 
@@ -106,7 +117,7 @@ export default function CalendarPage() {
 
       {view === 'agenda' && (
         [...new Set(visible.map((e) => e.date))].map((d) => (
-          <DayList key={d} t={t} day={d} events={byDay(d)} holidays={holidays} memberById={memberById} conflicts={conflicts} colorOf={colorOf} onOpen={setOpen} compact />
+          <DayList key={d} t={t} day={d} events={byDay(d)} holidays={holidays} memberById={memberById} conflicts={conflicts} colorOf={colorOf} onOpen={setOpen} plans={plansOn(d)} compact />
         ))
       )}
       {view === 'agenda' && visible.length === 0 && <Empty>{t('common.empty')}</Empty>}
@@ -161,9 +172,20 @@ export default function CalendarPage() {
   );
 }
 
-function DayList({ t, day, events, holidays, memberById, conflicts, colorOf, onOpen, compact }) {
+function DayList({ t, day, events, holidays, memberById, conflicts, colorOf, onOpen, compact, plans = [] }) {
   return (
     <Card title={compact ? fmtDayLong(day) : undefined}>
+      {/* Plan bandı en üstte: o gün bir seyahat veya etkinlik sürüyorsa bağlamı verir. */}
+      {plans.map(({ plan, span }) => (
+        <Link className="event" key={plan.id} href="/planlar/" style={{ textDecoration: 'none', color: 'inherit' }}>
+          <div className="event__time">{plan.icon || '🧭'}</div>
+          <div className="event__bar" style={{ background: plan.color || 'var(--color-brand)' }} />
+          <div style={{ flex: 1 }}>
+            <div className="event__title">{plan.title}</div>
+            <div className="event__meta">{t('plans.' + plan.kind)} · {t('today.activePlan', span.day, span.total)}</div>
+          </div>
+        </Link>
+      ))}
       {holidays[day] && holidays[day].map((h) => (
         <div className="event" key={h.key}>
           <div className="event__time">🎉</div>
@@ -171,7 +193,7 @@ function DayList({ t, day, events, holidays, memberById, conflicts, colorOf, onO
           <div><div className="event__title">{h.name}</div><div className="event__meta">{t('calendar.holiday')} · {h.country === 'CL' ? '🇨🇱' : '🇹🇷'} {t('countries.' + h.country)}</div></div>
         </div>
       ))}
-      {events.length === 0 && !holidays[day] && <Empty>{t('today.noEvents')}</Empty>}
+      {events.length === 0 && !holidays[day] && plans.length === 0 && <Empty>{t('today.noEvents')}</Empty>}
       {events.map((e) => (
         <div className="event" key={e.id + e.date} onClick={() => onOpen(e)} style={{ cursor: 'pointer' }}>
           <div className="event__time">{e.all_day ? t('calendar.allDay') : fmtTime(e.starts_at)}<br /><span className="faint">{e.all_day ? '' : fmtTime(e.ends_at)}</span></div>

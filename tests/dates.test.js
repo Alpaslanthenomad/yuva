@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { startOfWeek, weekDays, monthGrid, expandRRule, nextOccurrence, nextOccasionDate, overlaps, addMonths, relativeLabel } from '../lib/dates.js';
+import { startOfWeek, weekDays, monthGrid, expandRRule, nextOccurrence, dayInRange, nextOccasionDate, overlaps, addMonths, relativeLabel } from '../lib/dates.js';
 import { easterSunday, holidaysCL, holidaysTR, holidayMap } from '../lib/holidays.js';
 
 test('startOfWeek Pazartesi', () => {
@@ -98,4 +98,14 @@ test('nextOccurrence: kural yoksa veya vade yoksa null', () => {
 });
 test('nextOccurrence: UNTIL geçtiyse null', () => {
   assert.equal(nextOccurrence('FREQ=WEEKLY;UNTIL=20260925', '2026-09-23'), null);
+});
+
+test('dayInRange: plan aralığında kaçıncı gün', () => {
+  assert.deepEqual(dayInRange('2026-10-03', '2026-10-01', '2026-10-05'), { day: 3, total: 5 });
+  assert.deepEqual(dayInRange('2026-10-01', '2026-10-01', '2026-10-01'), { day: 1, total: 1 });
+  assert.equal(dayInRange('2026-09-30', '2026-10-01', '2026-10-05'), null);
+  assert.equal(dayInRange('2026-10-06', '2026-10-01', '2026-10-05'), null);
+  // ends_on boşsa tek günlük sayılır
+  assert.deepEqual(dayInRange('2026-10-01', '2026-10-01', null), { day: 1, total: 1 });
+  assert.equal(dayInRange('2026-10-01', null, null), null);
 });
