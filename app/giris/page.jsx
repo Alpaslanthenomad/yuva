@@ -11,7 +11,7 @@ import { useT, useLocale, LanguageSwitch } from '../../lib/i18n/context.jsx';
  * Şifre; Windows, Mac ve telefonda aynı çalışır, tarayıcı kaydeder.
  */
 export default function LoginPage() {
-  const { repo, user, household, reload } = useApp();
+  const { repo, user, household, bootstrapFailed, reload } = useApp();
   const t = useT();
   const { locale } = useLocale();
 
@@ -67,6 +67,20 @@ export default function LoginPage() {
         <p className="muted" style={{ margin: 'var(--sp-2) 0 var(--sp-4)' }}>{t('app.tagline')}</p>
         <div style={{ marginBottom: 'var(--sp-4)' }}><LanguageSwitch /></div>
         <a className="btn btn--block" href="/">{t('auth.demoEnter')}</a>
+      </Card>
+    );
+  }
+
+  // ---- Giriş yapılmış ama hane yüklenemedi (ağ/sunucu) ----
+  // Burada hane KURMA formu gösterilmez: kullanıcının hanesi büyük olasılıkla
+  // var, sadece getirilemedi. Form gösterilseydi ikinci bir hane kurup veriyi
+  // ikiye bölebilirdi.
+  if (user && !household && bootstrapFailed) {
+    return (
+      <Card style={{ marginTop: 'var(--sp-8)' }}>
+        <h1 className="h1">{t('app.name')}</h1>
+        <p className="muted" style={{ margin: 'var(--sp-2) 0 var(--sp-4)' }}>{t('sync.cantLoad')}</p>
+        <button className="btn btn--block" onClick={() => reload()}>{t('sync.retry')}</button>
       </Card>
     );
   }

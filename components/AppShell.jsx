@@ -6,6 +6,7 @@ import BottomNav from './BottomNav.jsx';
 import QuickAdd from './QuickAdd.jsx';
 import { useT, useLocale, LanguageSwitch } from '../lib/i18n/context.jsx';
 import { fmtDay, fmtTime } from '../lib/dates.js';
+import { authScreen } from '../lib/authState.js';
 
 const AppCtx = createContext(null);
 export const useApp = () => useContext(AppCtx);
@@ -130,7 +131,11 @@ export default function AppShell({ children }) {
   }), [repo, state, tick, bump, reload, locale]);
 
   const isAuthPage = pathname?.startsWith('/giris');
-  const needsAuth = !state.loading && repo.mode === 'supabase' && !state.household;
+  // Hangi ekran çizilecek — karar lib/authState.js'te, tek yerde ve testli.
+  // Özü: ŞİFRE EKRANI YALNIZCA OTURUM YOKKEN.
+  const screen = authScreen(state, repo.mode);
+  const needsAuth = screen === 'login' || screen === 'setup';
+  const cantLoad = screen === 'retry';
 
   return (
     <AppCtx.Provider value={value}>
@@ -158,6 +163,12 @@ export default function AppShell({ children }) {
             </div>
           )}
           {state.loading ? <div className="empty">{t('common.loading')}</div>
+            : cantLoad && !isAuthPage ? (
+              <div className="empty">
+                <p>{t('sync.cantLoad')}</p>
+                <button className="btn" onClick={() => reload()}>{t('sync.retry')}</button>
+              </div>
+            )
             : needsAuth && !isAuthPage ? <AuthGate />
             : children}
         </main>

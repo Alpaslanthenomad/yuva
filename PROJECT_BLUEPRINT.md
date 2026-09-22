@@ -335,3 +335,10 @@ Tüm tablolar `household_id` taşır; RLS `is_household_member(household_id)`
   aranıyor. Hiçbiri tutmazsa kategori BOŞ bırakılıyor — hane kategorisini
   yeniden adlandırdıysa yanlış kategoriye yazmaktansa kullanıcı seçsin; yanlış
   kategori sessizce bütçeyi bozar, boş kategori göze çarpar.
+- 2026-09-22 — **Şifre ekranı yalnızca oturum yokken** (`lib/authState.js`).
+  Açılış çağrısı patlayınca oturumu da düşürmek en can sıkıcı hatayı üretti:
+  kullanıcı girişliyken şifre isteniyordu ve telefonda ağın bir saniye
+  kesilmesi yetiyordu. Karar tek bir saf fonksiyona alındı ve testlendi.
+  Oturum varken hane yüklenemiyorsa ekran "tekrar dene" olur; hane KURMA
+  formu gösterilmez, çünkü kullanıcının hanesi büyük olasılıkla vardır ve
+  form ikinci bir hane kurdurup veriyi ikiye bölebilirdi.
