@@ -60,11 +60,13 @@ Faz tanımları `PROJECT_BLUEPRINT.md §5`.
 
 - [x] Hızlı eklemede liste kimliği: `shopping_add_item` RPC'si varsayılan listeyi DB'de çözüyor; Bugün ekranı, "+" menüsü ve liste içi aynı davranıyor (migration 0016) — 2026-09-22
 - [x] "Alışverişi harcamaya çevir" tek işlemde: `shopping_checkout` harcamayı yazıp işaretlileri aynı transaction'da siliyor; çift kayıt riski kapandı (migration 0016) — 2026-09-22
-- [ ] Görev oluşturma formunda tekrar seçeneği yok — altyapı var, giriş yolu yok
+- [x] Görev formuna tekrar seçeneği eklendi. Kural vadeye çapalanıyor: "her ay" + vade ayın 31'i → `FREQ=MONTHLY;BYMONTHDAY=31`, yani seri şubattan sonra 31'e geri dönüyor. Olay formu da aynı yardımcıları kullanıyor (`buildRRule` / `freqKeyOf`, lib/dates.js) — 2026-09-22
+- [x] **Hata düzeltme:** Aile › Görevler'de tekrarlayan görevi geri almanın yolu yoktu. Görev "bitti" olmadığı için onay kutusu hemen boşalıyor, ikinci tıklama geri alma değil ikinci bir tamamlama oluyordu — vade bir tekrar daha ileri kaçıyordu. Tamamlayınca satırda "Yapıldı / Geri al" çıkıyor. `demoRepo` de `prev_due_on`'u saklayıp geri alıyor (0014 ile aynı davranış) — 2026-09-22
+- [x] Plan düzenleme: detay sayfasında ⚙️ sekmesi — başlık, yer, tarihler, bütçe/hedef, para birimi ve durum. Tür düzenlemede değişmiyor (bütçe/hedef alanı ve ikon türe bağlı) — 2026-09-22
+- [x] Hedefe katkı ekleme: hedef planlarda 🐖 sekmesi — tutar, para birimi, tarih, not; ilerleme/hedef/kalan üstte. Kur katkı anında DB'de donuyor (0006), ön yüz göndermiyor — 2026-09-22
 - [ ] Sabah özeti bildirimi alıcı üyeye göre süzülmüyor
 - [ ] Yeniden bağlanınca kaçırılan değişiklikler için tam yenileme yok
-- [ ] Plan düzenleme (tarih/başlık/durum/bütçe) ve hedefe katkı ekleme ekranı yok
-- [ ] Kritik akışlar test dışı: görev geri alma, misafir erişimi, alışveriş kaydı
+- [ ] Kritik akışlar test dışı: işlem düzenleme/silme, belge süresi hatırlatması
 - [ ] Gerçek çevrimdışı veri katmanı (service worker kabuğu var, veri yok)
 
 - [x] Supabase projesi `yuva` (sa-east-1) açıldı; 0001a/0001b/0002/0003 uygulandı; kurlar tohumlandı — 2026-09-21

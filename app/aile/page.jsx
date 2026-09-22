@@ -293,6 +293,10 @@ function DocumentForm({ t, onDone }) {
 function TaskRow({ task: k, t, repo, bump, members, memberById }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Tekrarlayan görev tamamlanınca is_done false kalır (vade ileri taşınır), yani
+  // onay kutusu hemen boşalır. İkinci tıklama "geri al" değil, ikinci bir tamamlama
+  // olurdu — vade bir tekrar daha ileri kaçıyordu. Geri alma ayrı satırda.
+  const [justDone, setJustDone] = useState(false);
   const next = k.rrule && k.due_on ? nextOccurrence(k.rrule, k.due_on) : null;
 
   const run = async (fn) => { setBusy(true); try { await fn(); bump(); } finally { setBusy(false); } };
@@ -300,14 +304,25 @@ function TaskRow({ task: k, t, repo, bump, members, memberById }) {
   return (
     <>
       <Row
-        icon={<input type="checkbox" checked={k.is_done} disabled={busy}
-          onChange={() => run(() => (k.is_done ? repo.tasks.uncomplete(k.id) : repo.tasks.complete(k.id, next)))}
+        icon={<input type="checkbox" checked={k.is_done} disabled={busy || justDone}
+          onChange={() => run(async () => {
+            if (k.is_done) { await repo.tasks.uncomplete(k.id); return; }
+            await repo.tasks.complete(k.id, next);
+            if (next) setJustDone(true);
+          })}
           style={{ width: 22, height: 22 }} />}
         title={k.title} done={k.is_done}
         sub={[memberById(k.assignee_member_id)?.display_name, k.due_on && relativeLabel(k.due_on),
           k.rrule && '↻', k.plan_id && '🧭'].filter(Boolean).join(' · ')}
         onClick={() => setOpen((x) => !x)}
         end={k.points ? <span className="tag tag--ok">⭐ {k.points}</span> : null} />
+      {justDone && (
+        <div className="between" style={{ padding: '0 var(--sp-3) var(--sp-3)' }}>
+          <span className="faint">{t('today.doneJustNow')}</span>
+          <button type="button" className="chip" disabled={busy}
+            onClick={() => run(async () => { await repo.tasks.uncomplete(k.id); setJustDone(false); })}>{t('today.undo')}</button>
+        </div>
+      )}
       {open && (
         <div style={{ padding: '0 var(--sp-3) var(--sp-3)' }}>
           {next && <div className="faint" style={{ marginBottom: 'var(--sp-2)' }}>{t('tasks.nextOn', relativeLabel(next))}</div>}

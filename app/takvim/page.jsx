@@ -3,9 +3,9 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useApp } from '../../components/AppShell.jsx';
 import { Card, Seg, Chips, Avatars, Empty, Sheet, Row } from '../../components/ui.jsx';
-import { EventForm, repeatKeyOf } from '../../components/QuickAdd.jsx';
+import { EventForm } from '../../components/QuickAdd.jsx';
 import { useT } from '../../lib/i18n/context.jsx';
-import { today, weekDays, monthGrid, addDays, addMonths, periodOf, fmtPeriod, fmtDayLong, fmtTime, dowNames, fromISODate, overlaps, dayInRange } from '../../lib/dates.js';
+import { today, weekDays, monthGrid, addDays, addMonths, periodOf, fmtPeriod, fmtDayLong, fmtTime, dowNames, fromISODate, overlaps, dayInRange, freqKeyOf } from '../../lib/dates.js';
 import { holidayMap } from '../../lib/holidays.js';
 
 export default function CalendarPage() {
@@ -133,7 +133,7 @@ export default function CalendarPage() {
             <>
               <Row icon="🕒" title={open.all_day ? t('calendar.allDay') : `${fmtTime(open.starts_at)} – ${fmtTime(open.ends_at)}`} sub={fmtDayLong(open.date)} />
               <Row icon="🏷️" title={t('calendar.categories.' + open.category)}
-                   sub={open.rrule ? `${t('calendar.repeat')}: ${t('calendar.repeats.' + repeatKeyOf(open.rrule))}` : null} />
+                   sub={open.rrule ? `${t('calendar.repeat')}: ${t('calendar.repeats.' + freqKeyOf(open.rrule))}` : null} />
               {open.location && <Row icon="📍" title={open.location} />}
               <Row icon="👥" title={<Avatars members={(open.attendees || []).map(memberById).filter(Boolean)} size="md" />} />
               {open.description && <p className="muted" style={{ padding: 'var(--sp-3) 0' }}>{open.description}</p>}

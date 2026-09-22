@@ -8,6 +8,7 @@ import { today, daysBetween, fmtDay } from '../../lib/dates.js';
 import { formatMoney, budgetState, parseAmount, minorToDecimal, planTotals, CURRENCY_CODES } from '../../lib/money.js';
 
 const KINDS = ['trip', 'gathering', 'project', 'goal'];
+const STATUSES = ['idea', 'planned', 'active', 'done', 'cancelled'];
 const ICONS = { trip: '✈️', gathering: '🎉', project: '🔨', goal: '🎯' };
 
 export default function PlansPage() {
@@ -90,6 +91,7 @@ function PlanCard({ t, plan, onOpen, baseCurrency, rates, repo, tick }) {
 function PlanDetail({ t, plan, onClose, repo, tick, bump, baseCurrency, rates, memberById }) {
   const { actual, items } = usePlanNumbers(plan, repo, tick, baseCurrency, rates);
   const [sub, setSub] = useState('items');
+  const isGoal = plan.kind === 'goal';
   const [newItem, setNewItem] = useState('');
   const [newKind, setNewKind] = useState('checklist');
   const cur = plan.budget_currency || baseCurrency;
@@ -114,7 +116,11 @@ function PlanDetail({ t, plan, onClose, repo, tick, bump, baseCurrency, rates, m
         </div>
       )}
       {plan.kind === 'gathering' && <div className="banner" style={{ background: 'var(--color-brand-soft)', color: 'var(--color-brand-ink)' }}>👥 {t('plans.guests')}: {t('plans.guestSummary', guestsYes, guests.length)}</div>}
-      <Chips value={sub} onChange={setSub} options={[{ value: 'items', label: '📋 ' + t('plans.items') }, { value: 'expense', label: '💸 ' + t('quick.expense') }, { value: 'task', label: '✅ ' + t('quick.task') }]} />
+      <Chips value={sub} onChange={setSub} options={[
+        { value: 'items', label: '📋 ' + t('plans.items') },
+        ...(isGoal ? [{ value: 'contrib', label: '🐖 ' + t('plans.contributions') }] : [{ value: 'expense', label: '💸 ' + t('quick.expense') }]),
+        { value: 'task', label: '✅ ' + t('quick.task') },
+        { value: 'edit', label: '⚙️ ' + t('common.edit') }]} />
       <div className="spacer" />
       {sub === 'items' && (
         <>
@@ -144,32 +150,45 @@ function PlanDetail({ t, plan, onClose, repo, tick, bump, baseCurrency, rates, m
       )}
       {sub === 'expense' && <ExpenseForm planId={plan.id} onDone={() => setSub('items')} />}
       {sub === 'task' && <TaskForm planId={plan.id} onDone={() => setSub('items')} />}
+      {sub === 'contrib' && <Contributions t={t} plan={plan} repo={repo} tick={tick} bump={bump} cur={cur} baseCurrency={baseCurrency} rates={rates} />}
+      {sub === 'edit' && <PlanForm t={t} plan={plan} onDone={onClose} />}
     </Sheet>
   );
 }
 
-function PlanForm({ t, onDone }) {
+/**
+ * Plan formu. `plan` verilirse düzenleme kipi: alanlar dolu gelir, kaydet
+ * mevcut planı günceller. Tür düzenlemede değiştirilmez — bütçe/hedef alanı
+ * ve ikon türe bağlı; sonradan değiştirmek kayıtları tutarsız bırakır.
+ */
+function PlanForm({ t, onDone, plan }) {
   const { repo, bump, baseCurrency } = useApp();
-  const [kind, setKind] = useState('trip');
-  const [title, setTitle] = useState('');
-  const [dest, setDest] = useState('');
-  const [s, setS] = useState('');
-  const [e, setE] = useState('');
-  const [budget, setBudget] = useState('');
-  const [cur, setCur] = useState(baseCurrency);
+  const editing = Boolean(plan);
+  const [kind, setKind] = useState(plan?.kind || 'trip');
+  const [title, setTitle] = useState(plan?.title || '');
+  const [dest, setDest] = useState(plan?.destination || '');
+  const [s, setS] = useState(plan?.starts_on || '');
+  const [e, setE] = useState(plan?.ends_on || '');
+  const [status, setStatus] = useState(plan?.status || 'planned');
+  const [budget, setBudget] = useState(
+    plan ? String((plan.kind === 'goal' ? plan.target_amount : plan.budget_amount) ?? '') : '');
+  const [cur, setCur] = useState(plan?.budget_currency || baseCurrency);
   const submit = async (ev) => {
     ev.preventDefault(); if (!title.trim()) return;
     const minor = parseAmount(budget, cur);
-    await repo.plans.create({
-      kind, title: title.trim(), destination: dest || null, starts_on: s || null, ends_on: e || s || null,
-      budget_amount: kind !== 'goal' && minor ? minorToDecimal(minor, cur) : null, target_amount: kind === 'goal' && minor ? minorToDecimal(minor, cur) : null,
-      budget_currency: cur, icon: ICONS[kind], status: 'planned',
-    });
+    const row = {
+      title: title.trim(), destination: dest || null, starts_on: s || null, ends_on: e || s || null,
+      budget_amount: kind !== 'goal' && minor ? minorToDecimal(minor, cur) : null,
+      target_amount: kind === 'goal' && minor ? minorToDecimal(minor, cur) : null,
+      budget_currency: cur, status,
+    };
+    if (editing) await repo.plans.update(plan.id, row);
+    else await repo.plans.create({ ...row, kind, icon: ICONS[kind] });
     bump(); onDone();
   };
   return (
     <form onSubmit={submit}>
-      <Chips value={kind} onChange={setKind} options={KINDS.map((k) => ({ value: k, label: `${ICONS[k]} ${t('plans.' + k)}` }))} />
+      {!editing && <Chips value={kind} onChange={setKind} options={KINDS.map((k) => ({ value: k, label: `${ICONS[k]} ${t('plans.' + k)}` }))} />}
       <div className="spacer" />
       <Field label={t('calendar.titleField')}><input className="input" autoFocus value={title} onChange={(x) => setTitle(x.target.value)} /></Field>
       {kind !== 'goal' && <Field label={t('calendar.location')}><input className="input" value={dest} onChange={(x) => setDest(x.target.value)} /></Field>}
@@ -181,7 +200,77 @@ function PlanForm({ t, onDone }) {
         <Field label={kind === 'goal' ? t('plans.target') : t('plans.budget')}><input className="input" inputMode="decimal" value={budget} onChange={(x) => setBudget(x.target.value)} /></Field>
         <Field label={t('money.currency')}><select className="select" value={cur} onChange={(x) => setCur(x.target.value)}>{CURRENCY_CODES.map((c) => <option key={c}>{c}</option>)}</select></Field>
       </div>
+      <Field label={t('plans.status')}>
+        <select className="select" value={status} onChange={(x) => setStatus(x.target.value)}>
+          {STATUSES.map((k) => <option key={k} value={k}>{t('plans.statuses.' + k)}</option>)}
+        </select>
+      </Field>
       <button className="btn btn--block">{t('common.save')}</button>
     </form>
+  );
+}
+
+/**
+ * Hedef katkıları. Hedefin ilerlemesi harcamadan değil katkılardan gelir;
+ * katkı girmenin ekranda yolu yoktu, hedef hep %0 görünüyordu.
+ * Kur katkı anında DB'de donduruluyor (0006) — buradan gönderilmiyor.
+ */
+function Contributions({ t, plan, repo, tick, bump, cur, baseCurrency, rates }) {
+  const [rows, setRows] = useState(null);
+  const [amount, setAmount] = useState('');
+  const [ccy, setCcy] = useState(cur);
+  const [date, setDate] = useState(today());
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  useEffect(() => { repo.plans.contributions(plan.id).then(setRows); }, [repo, plan.id, tick]);
+
+  const submit = async (ev) => {
+    ev.preventDefault();
+    const minor = parseAmount(amount, ccy);
+    if (!minor) return;
+    setBusy(true); setErr('');
+    try {
+      await repo.plans.addContribution({ plan_id: plan.id, amount: minorToDecimal(minor, ccy), currency: ccy, on_date: date, note: note || null });
+      setAmount(''); setNote(''); bump();
+    } catch (ex) { setErr(ex.message); } finally { setBusy(false); }
+  };
+
+  const target = Number(plan.target_amount || 0);
+  const done = rows ? planTotals([], rows, baseCurrency, cur, rates).contributed : 0;
+
+  return (
+    <>
+      {target > 0 && (
+        <div className="stats" style={{ marginBottom: 'var(--sp-3)' }}>
+          <div className="stat"><div className="stat__label">{t('plans.progress')}</div><div className="stat__value">{formatMoney(done, cur, { compact: true })}</div></div>
+          <div className="stat"><div className="stat__label">{t('plans.target')}</div><div className="stat__value">{formatMoney(target, cur, { compact: true })}</div></div>
+          <div className="stat"><div className="stat__label">{t('plans.remaining')}</div><div className="stat__value">{formatMoney(Math.max(0, target - done), cur, { compact: true })}</div></div>
+        </div>
+      )}
+      <form onSubmit={submit}>
+        <div className="grid-2">
+          <Field label={t('money.amount')}><input className="input" inputMode="decimal" autoFocus value={amount} onChange={(x) => setAmount(x.target.value)} /></Field>
+          <Field label={t('money.currency')}><select className="select" value={ccy} onChange={(x) => setCcy(x.target.value)}>{CURRENCY_CODES.map((c) => <option key={c}>{c}</option>)}</select></Field>
+        </div>
+        <div className="grid-2">
+          <Field label={t('money.date')}><input className="input" type="date" value={date} onChange={(x) => setDate(x.target.value)} /></Field>
+          <Field label={t('common.note')}><input className="input" value={note} onChange={(x) => setNote(x.target.value)} /></Field>
+        </div>
+        {err && <div className="banner" style={{ color: 'var(--color-danger)' }}>{err}</div>}
+        <button className="btn btn--block" disabled={busy}>{t('plans.addContribution')}</button>
+      </form>
+      <div className="spacer" />
+      {rows && rows.length > 0 && (
+        <Card title={t('plans.contributions')} className="card--flat">
+          {rows.map((c) => (
+            <Row key={c.id} icon="🐖" title={formatMoney(c.amount, c.currency)}
+              sub={[fmtDay(c.on_date), c.note].filter(Boolean).join(' · ')} />
+          ))}
+        </Card>
+      )}
+      {rows && rows.length === 0 && <Empty>{t('plans.noContributions')}</Empty>}
+    </>
   );
 }

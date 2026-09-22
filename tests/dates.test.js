@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { startOfWeek, weekDays, monthGrid, expandRRule, nextOccurrence, dayInRange, nextOccasionDate, overlaps, addMonths, relativeLabel } from '../lib/dates.js';
+import { startOfWeek, weekDays, monthGrid, expandRRule, nextOccurrence, dayInRange, nextOccasionDate, overlaps, addMonths, relativeLabel, buildRRule, freqKeyOf } from '../lib/dates.js';
 import { easterSunday, holidaysCL, holidaysTR, holidayMap } from '../lib/holidays.js';
 
 test('startOfWeek Pazartesi', () => {
@@ -121,4 +121,29 @@ test('expandRRule BYMONTHDAY=-1: ayın son günü', () => {
   assert.equal(nextOccurrence('FREQ=MONTHLY;BYMONTHDAY=-1', '2026-01-31'), '2026-02-28');
   assert.equal(nextOccurrence('FREQ=MONTHLY;BYMONTHDAY=-1', '2026-02-28'), '2026-03-31');
   assert.equal(nextOccurrence('FREQ=MONTHLY;BYMONTHDAY=-1', '2026-11-30'), '2026-12-31');
+});
+
+test('buildRRule: aylıkta çapa vadeye yazılır', () => {
+  assert.equal(buildRRule('none', '2026-01-31'), null);
+  assert.equal(buildRRule('daily', '2026-01-31'), 'FREQ=DAILY');
+  assert.equal(buildRRule('weekly', '2026-01-31'), 'FREQ=WEEKLY');
+  assert.equal(buildRRule('yearly', '2026-01-31'), 'FREQ=YEARLY');
+  assert.equal(buildRRule('monthly', '2026-01-31'), 'FREQ=MONTHLY;BYMONTHDAY=31');
+  assert.equal(buildRRule('monthly', '2026-03-05'), 'FREQ=MONTHLY;BYMONTHDAY=5');
+  // Vade yoksa çapasız kural: formda tekrar seçilince vade zorunlu, ama kütüphane patlamamalı.
+  assert.equal(buildRRule('monthly', null), 'FREQ=MONTHLY');
+});
+test('buildRRule + nextOccurrence: aylık görev şubattan sonra 31\'e döner', () => {
+  const r = buildRRule('monthly', '2026-01-31');
+  const feb = nextOccurrence(r, '2026-01-31');
+  assert.equal(feb, '2026-02-28');
+  assert.equal(nextOccurrence(r, feb), '2026-03-31');
+});
+test('freqKeyOf: FREQ dışındaki parçalar seçimi bozmaz', () => {
+  assert.equal(freqKeyOf(null), 'none');
+  assert.equal(freqKeyOf('FREQ=MONTHLY;BYMONTHDAY=31'), 'monthly');
+  assert.equal(freqKeyOf('FREQ=WEEKLY;INTERVAL=2;BYDAY=MO'), 'weekly');
+  assert.equal(freqKeyOf('FREQ=DAILY'), 'daily');
+  assert.equal(freqKeyOf('FREQ=YEARLY'), 'yearly');
+  assert.equal(freqKeyOf('BOZUK'), 'none');
 });

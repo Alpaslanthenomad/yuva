@@ -4,7 +4,7 @@ import { useApp } from './AppShell.jsx';
 import { Sheet, Field } from './ui.jsx';
 import { useT } from '../lib/i18n/context.jsx';
 import { parseAmount, minorToDecimal, CURRENCY_CODES, CURRENCIES } from '../lib/money.js';
-import { today } from '../lib/dates.js';
+import { today, buildRRule, freqKeyOf } from '../lib/dates.js';
 
 const TABS = [
   { key: 'expense', icon: '💸' }, { key: 'event', icon: '📅' }, { key: 'task', icon: '✅' }, { key: 'shopping', icon: '🛒' },
@@ -199,9 +199,8 @@ export function ExpenseForm({ onDone, planId, txn, preset, checkoutListId }) {
   );
 }
 
-const RR = { none: null, daily: 'FREQ=DAILY', weekly: 'FREQ=WEEKLY', monthly: 'FREQ=MONTHLY', yearly: 'FREQ=YEARLY' };
-/** 'FREQ=WEEKLY' → 'weekly'; bilinmeyen kural 'none' sayılır (düzenlerken bozulmasın diye korunur). */
-export const repeatKeyOf = (rrule) => Object.keys(RR).find((k) => RR[k] === rrule) || 'none';
+/** Tekrar seçenekleri; karşılıkları lib/dates.js'te (buildRRule / freqKeyOf). */
+const REPEAT_KEYS = ['none', 'daily', 'weekly', 'monthly', 'yearly'];
 const hhmm = (iso) => { const d = new Date(iso); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
 
 /**
@@ -218,7 +217,7 @@ export function EventForm({ onDone, planId, date0, event }) {
   const [end, setEnd] = useState(event && !event.all_day ? hhmm(event.ends_at) : '11:00');
   const [allDay, setAllDay] = useState(event?.all_day || false);
   const [category, setCategory] = useState(event?.category || 'other');
-  const [repeat, setRepeat] = useState(repeatKeyOf(event?.rrule));
+  const [repeat, setRepeat] = useState(freqKeyOf(event?.rrule));
   const [att, setAtt] = useState(event?.attendees || []);
   const [location, setLocation] = useState(event?.location || '');
   const [busy, setBusy] = useState(false);
@@ -230,7 +229,7 @@ export function EventForm({ onDone, planId, date0, event }) {
     try {
       const s = new Date(`${date}T${allDay ? '00:00' : start}:00`).toISOString();
       const en = new Date(`${date}T${allDay ? '23:59' : end}:00`).toISOString();
-      const row = { title: title.trim(), starts_at: s, ends_at: en, all_day: allDay, category, rrule: RR[repeat], location: location || null };
+      const row = { title: title.trim(), starts_at: s, ends_at: en, all_day: allDay, category, rrule: buildRRule(repeat, date), location: location || null };
       if (editing) {
         await repo.events.update(event.id, row);
         bump(); onDone?.(title);
@@ -270,7 +269,7 @@ export function EventForm({ onDone, planId, date0, event }) {
       <div className="grid-2">
         <Field label={t('calendar.repeat')}>
           <select className="select" value={repeat} onChange={(e) => setRepeat(e.target.value)}>
-            {Object.entries(t('calendar.repeats')).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            {REPEAT_KEYS.map((k) => <option key={k} value={k}>{t('calendar.repeats.' + k)}</option>)}
           </select>
         </Field>
         <Field label={t('calendar.location')}><input className="input" value={location} onChange={(e) => setLocation(e.target.value)} /></Field>
@@ -281,6 +280,12 @@ export function EventForm({ onDone, planId, date0, event }) {
   );
 }
 
+/**
+ * Görev formu. Tekrar seçeneği vadeye çapalanır: "her ay" seçilip vade ayın
+ * 31'i ise kural BYMONTHDAY=31 olur ve seri şubattan sonra 31'e geri döner
+ * (bkz. lib/dates.js buildRRule). Tekrar seçildiğinde vade zorunludur —
+ * vadesiz bir tekrar kuralının tutunacağı gün yok.
+ */
 export function TaskForm({ onDone, planId }) {
   const { repo, members, bump } = useApp();
   const t = useT();
@@ -288,10 +293,15 @@ export function TaskForm({ onDone, planId }) {
   const [assignee, setAssignee] = useState('');
   const [due, setDue] = useState(today());
   const [points, setPoints] = useState(0);
+  const [repeat, setRepeat] = useState('none');
+  const [err, setErr] = useState('');
   const submit = async (e) => {
     e.preventDefault(); if (!title.trim()) return;
-    await repo.tasks.create({ title: title.trim(), assignee_member_id: assignee || null, due_on: due || null, points: Number(points) || 0, plan_id: planId || null });
-    bump(); onDone?.(title); setTitle('');
+    if (repeat !== 'none' && !due) { setErr(t('tasks.repeatNeedsDue')); return; }
+    setErr('');
+    await repo.tasks.create({ title: title.trim(), assignee_member_id: assignee || null, due_on: due || null,
+      points: Number(points) || 0, rrule: buildRRule(repeat, due), plan_id: planId || null });
+    bump(); onDone?.(title); setTitle(''); setRepeat('none');
   };
   return (
     <form onSubmit={submit}>
@@ -306,6 +316,13 @@ export function TaskForm({ onDone, planId }) {
         <Field label={t('family.due')}><input className="input" type="date" value={due} onChange={(e) => setDue(e.target.value)} /></Field>
         <Field label={t('family.points')}><input className="input" type="number" min="0" value={points} onChange={(e) => setPoints(e.target.value)} /></Field>
       </div>
+      <Field label={t('calendar.repeat')}>
+        <select className="select" value={repeat} onChange={(e) => setRepeat(e.target.value)}>
+          {REPEAT_KEYS.map((k) => <option key={k} value={k}>{t('calendar.repeats.' + k)}</option>)}
+        </select>
+      </Field>
+      {repeat !== 'none' && due && <div className="faint" style={{ marginBottom: 'var(--sp-2)' }}>{t('tasks.repeatHint')}</div>}
+      {err && <div className="banner" style={{ color: 'var(--color-danger)' }}>{err}</div>}
       <button className="btn btn--block">{t('common.save')}</button>
     </form>
   );
