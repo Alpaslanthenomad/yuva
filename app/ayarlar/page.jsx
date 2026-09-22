@@ -13,6 +13,8 @@ export default function SettingsPage() {
   const [f, setF] = useState(null);
   const [copied, setCopied] = useState(false);
   const [rotating, setRotating] = useState(false);
+  const [backingUp, setBackingUp] = useState(false);
+  const [backupMsg, setBackupMsg] = useState(null);
   if (!household) return <Empty>{t('common.loading')}</Empty>;
 
   const form = f || {
@@ -98,6 +100,12 @@ export default function SettingsPage() {
       {repo.mode === 'supabase' && <PasswordCard t={t} repo={repo} />}
 
       <Card title={t('settings.data')}>
+        <button className="btn btn--block" disabled={backingUp}
+          onClick={async () => { setBackingUp(true); try { setBackupMsg(await exportBackup(repo)); } finally { setBackingUp(false); } }}>
+          {t('settings.exportJson')}
+        </button>
+        <div className="faint" style={{ margin: 'var(--sp-2) 0 var(--sp-3)' }}>{t('settings.backupHint')}</div>
+        {backupMsg !== null && <div className="banner">{t('settings.backupDone', backupMsg)}</div>}
         <div className="inline">
           <button className="btn btn--outline btn--sm" onClick={() => exportCsv(repo)}>{t('settings.exportCsv')}</button>
           {repo.mode === 'demo' && <button className="btn btn--outline btn--sm" onClick={() => { repo.reset(); location.reload(); }}>{t('settings.resetDemo')}</button>}
@@ -140,6 +148,24 @@ function PasswordCard({ t, repo }) {
       </form>
     </Card>
   );
+}
+
+/**
+ * Tam yedek: tüm haneyi tek JSON dosyası olarak indirir (0012).
+ * CSV yalnızca para işlemlerini kapsıyordu; takvim, planlar, görevler,
+ * belgeler ve alışveriş hiçbir yere çıkmıyordu.
+ * @returns {Promise<number>} indirilen kayıt sayısı
+ */
+async function exportBackup(repo) {
+  const data = await repo.backup.exportAll();
+  const count = Object.values(data).reduce((n, v) => n + (Array.isArray(v) ? v.length : 0), 0);
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `yuva-yedek-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  return count;
 }
 
 async function exportCsv(repo) {
