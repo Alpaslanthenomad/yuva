@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useApp } from '../../components/AppShell.jsx';
 import { Card, Row, Chips, Empty, Sheet, Field, Avatar } from '../../components/ui.jsx';
 import { TaskForm, ShoppingForm, ExpenseForm } from '../../components/QuickAdd.jsx';
+import ShoppingPicker from '../../components/ShoppingPicker.jsx';
 import { useT } from '../../lib/i18n/context.jsx';
 import { today, fmtDay, relativeLabel, weekDays, startOfWeek, nextOccurrence } from '../../lib/dates.js';
 
@@ -27,6 +28,7 @@ export default function FamilyPage() {
   const [sheet, setSheet] = useState(null);
   const [editing, setEditing] = useState(null);   // düzenlenen üye; null ise yeni kayıt
   const [toExpense, setToExpense] = useState(null);   // harcamaya çevrilecek alışveriş kalemleri
+  const [picker, setPicker] = useState(null);        // hızlı seçimi açık olan liste
 
   useEffect(() => { try { const x = new URLSearchParams(window.location.search).get('tab'); if (x && TABS.includes(x)) setTab(x); } catch { /* */ } }, []);
   useEffect(() => {
@@ -119,6 +121,14 @@ export default function FamilyPage() {
             ))}
             <div className="spacer" />
             <ShoppingForm listId={l.id} />
+            <div className="spacer" />
+            {/* Yazmadan sepet. Kapalı başlar: listeyi açan çoğu zaman
+                markette ve ızgarayı değil listeyi görmek ister. */}
+            <button type="button" className="btn btn--outline btn--block"
+              onClick={() => setPicker(picker === l.id ? null : l.id)}>
+              🧺 {picker === l.id ? t('shopping.hide') : t('shopping.quickPick')}
+            </button>
+            {picker === l.id && <ShoppingPicker listId={l.id} items={items} />}
             {checked.length > 0 && (
               <>
                 <div className="spacer" />

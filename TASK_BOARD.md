@@ -93,6 +93,7 @@ Faz tanımları `PROJECT_BLUEPRINT.md §5`.
 - [ ] `supabaseRepo` kalan contract metodlarını gerçek sorgularla doldur
 - [ ] Takvim: hafta görünümü sürükle-kaydır; RRULE düzenleme UI; çakışma uyarısı
 - [x] Para: işlem düzenleme ve silme — 2026-09-22
+- [x] Alışverişte yazmadan sepet: 8 reyon, 85 ürün, emoji ızgarası; dokunma açma/kapama. Markette işaretlenmiş kalem ızgarada solgun ve kilitli — buradan düşürmek markette unutmak demekti. "Süt (2 L)" gibi parantezli miktarlar katalogdaki "Süt" ile eşleşiyor, yoksa liste ikinci bir Süt ile çoğalıyordu — 2026-09-22
 - [ ] Para: filtre (ay/üye/kategori/hesap) ve rapor grafikleri
 - [x] Para: pg_cron her gün 12:00 UTC (≈ Santiago 09:00) `post_due_recurring` çalıştırıyor; fonksiyon artık gecikmiş dönemleri tek seferde yakalıyor, otomatik giderde her dönem için ayrı işlem yazıyor (migration 0011) — 2026-09-22
 - [x] Bütçe ekranı: kategori bazlı aylık zarflar; %80 uyarı / %100 aşım durumu `budgetState` içinde — 2026-09-22

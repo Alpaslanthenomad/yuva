@@ -313,3 +313,12 @@ Tüm tablolar `household_id` taşır; RLS `is_household_member(household_id)`
   olmamasından kötüdür. İki ayrım önemli: önbelleğe yalnızca AĞ hatasında
   düşülür (yetki hatasında düşmek, kullanıcının artık görmemesi gereken
   veriyi görmesi demekti) ve çıkışta önbellek silinir.
+- 2026-09-22 — **Alışveriş kataloğu emoji ile, dosya görsel değil.** Uygulama
+  statik dışa aktarılıyor ve dış sunucudan dosya çekmiyor; 85 küçük görsel
+  boyut, lisans ve çevrimdışı derdi demekti. Katalog `lib/shoppingCatalog.js`
+  içinde, ad iki dilde YAN YANA — i18n dosyalarına dağıtılsaydı bir dili
+  eklemeyi unutmak mümkün olurdu; burada test bunu yakalıyor.
+  Ad eşleşmesinde parantez içi yok sayılıyor ("Süt (2 L)" ↔ "Süt"), yoksa
+  ızgara işaretsiz görünüp listeye ikinci bir kalem ekliyordu.
+  Izgarada dokunma AÇMA/KAPAMA, ama markette işaretlenmiş kalem kilitli:
+  oradan düşürmek, markette unutmak demek.
