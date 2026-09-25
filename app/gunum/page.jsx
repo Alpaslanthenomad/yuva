@@ -12,8 +12,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useApp } from '../../components/AppShell.jsx';
 import { Card, Row, Bar, Chips, Empty, Field } from '../../components/ui.jsx';
-import { useT } from '../../lib/i18n/context.jsx';
+import { useT, useLocale } from '../../lib/i18n/context.jsx';
 import { today, fmtDayLong } from '../../lib/dates.js';
+import SupplementPicker from '../../components/SupplementPicker.jsx';
+import { supplementName } from '../../lib/supplementCatalog.js';
 
 const SCOPES = ['weekday', 'weekend'];
 const KINDS = ['daily', 'weekly', 'total'];
@@ -32,6 +34,7 @@ export default function MyDayPage() {
   const [tab, setTab] = useState('today');
   const [gun, setGun] = useState(null);
   const [hedefler, setHedefler] = useState([]);
+  const [takviye, setTakviye] = useState(null);
   // Dakikada bir tazelenen "şimdi": saat ilerledikçe vurgulanan blok kaysın.
   const [simdi, setSimdi] = useState(() => new Date());
 
@@ -42,8 +45,10 @@ export default function MyDayPage() {
 
   const yukle = useCallback(async () => {
     if (!household) return;
-    const [d, g] = await Promise.all([repo.personal.day(), repo.personal.goals()]);
-    setGun(d); setHedefler(g || []);
+    const [d, g, s] = await Promise.all([
+      repo.personal.day(), repo.personal.goals(), repo.personal.supplements(),
+    ]);
+    setGun(d); setHedefler(g || []); setTakviye(s || { items: [] });
   }, [repo, household]);
 
   useEffect(() => { yukle(); }, [yukle, tick]);
@@ -89,6 +94,8 @@ export default function MyDayPage() {
             ))}
           </Card>
 
+          <TakviyeKarti veri={takviye} repo={repo} t={t} yukle={yukle} bump={bump} />
+
           <Card title={t('gunum.goals')}>
             {hedefler.length === 0 && <Empty>{t('gunum.noGoals')}</Empty>}
             {hedefler.map((g) => <HedefSatiri key={g.id} g={g} repo={repo} t={t} yukle={yukle} bump={bump} />)}
@@ -98,7 +105,7 @@ export default function MyDayPage() {
         </>
       )}
 
-      {tab === 'setup' && <Duzen repo={repo} t={t} yukle={yukle} bump={bump} />}
+      {tab === 'setup' && <Duzen repo={repo} t={t} yukle={yukle} bump={bump} takviye={takviye} />}
     </>
   );
 }
@@ -151,7 +158,7 @@ function HedefSatiri({ g, repo, t, yukle, bump }) {
 }
 
 /** Şablon kurma: hafta içi / hafta sonu blokları ve hedefler. */
-function Duzen({ repo, t, yukle, bump }) {
+function Duzen({ repo, t, yukle, bump, takviye }) {
   const [scope, setScope] = useState('weekday');
   const [bloklar, setBloklar] = useState([]);
   const [hedefler, setHedefler] = useState([]);
@@ -192,6 +199,8 @@ function Duzen({ repo, t, yukle, bump }) {
         <div className="spacer" />
         <HedefFormu repo={repo} t={t} onDone={sonrasi} />
       </Card>
+
+      <TakviyeDuzeni repo={repo} t={t} veri={takviye} onDone={sonrasi} />
     </>
   );
 }
@@ -281,6 +290,131 @@ function HedefFormu({ repo, t, onDone }) {
         </Field>
       </div>
       <button className="btn btn--block" disabled={busy}>{t('gunum.addGoal')}</button>
+    </form>
+  );
+}
+
+/**
+ * Bugün: takviye işaretleme.
+ *
+ * TEK DOKUNUŞ = BİR DOZ. Günde iki kez alınan bir şeyde iki dokunuş gerekir;
+ * onay kutusu kullanmadım çünkü "yarısını aldım" onay kutusuyla anlatılamaz.
+ * Yanlış dokunuşun geri dönüşü var: satıra basılı kalan "−" düğmesi.
+ *
+ * HİÇ TAKVİYE YOKSA KART HİÇ ÇİZİLMİYOR. Kullanmayan biri için boş bir kart,
+ * her gün bakılan ekranda gereksiz gürültü.
+ */
+function TakviyeKarti({ veri, repo, t, yukle, bump }) {
+  const [busy, setBusy] = useState(null);
+  const items = veri?.items || [];
+  if (items.length === 0) return null;
+
+  const dokun = async (s, delta) => {
+    if (busy) return;
+    setBusy(s.id);
+    try { await repo.personal.takeSupplement(s.id, delta); bump(); await yukle(); } finally { setBusy(null); }
+  };
+
+  const kalan = items.filter((s) => !s.done).length;
+
+  return (
+    <Card title={t('gunum.supplements')}
+      action={<span className={kalan ? 'faint' : 'tag tag--ok'}>
+        {kalan ? t('gunum.supplementsLeft', kalan) : t('gunum.supplementsAllDone')}
+      </span>}>
+      {items.map((s) => (
+        <Row key={s.id} icon={s.icon || '💊'} title={s.title}
+          sub={[s.dose, s.per_day > 1 ? t('gunum.perDayTimes', s.per_day) : null].filter(Boolean).join(' · ')}
+          done={s.done}
+          end={<span className="faint">{t('gunum.takenOf', s.taken, s.per_day)}</span>}>
+          <div className="inline" style={{ marginTop: 'var(--sp-2)' }}>
+            <button type="button" className={'btn btn--sm' + (s.done ? ' btn--outline' : '')}
+              disabled={busy === s.id || s.done} onClick={() => dokun(s, 1)}>
+              {s.done ? '✓' : t('gunum.took')}
+            </button>
+            {s.taken > 0 && (
+              <button type="button" className="btn btn--ghost btn--sm"
+                disabled={busy === s.id} onClick={() => dokun(s, -1)}>−</button>
+            )}
+          </div>
+        </Row>
+      ))}
+    </Card>
+  );
+}
+
+/** Düzen: takviye listesini kurmak. Izgaradan seç ya da elle yaz. */
+function TakviyeDuzeni({ repo, t, veri, onDone }) {
+  const { locale } = useLocale();
+  const [busyKey, setBusyKey] = useState(null);
+  const items = veri?.items || [];
+
+  const ekle = async (item) => {
+    setBusyKey(item.key);
+    try {
+      await repo.personal.addSupplement({
+        catalog_key: item.key, title: supplementName(item, locale),
+        icon: item.emoji, dose: item.dose || null, per_day: 1,
+      });
+      await onDone();
+    } finally { setBusyKey(null); }
+  };
+
+  return (
+    <Card title={t('gunum.supplements')}>
+      {items.length === 0 && <Empty>{t('gunum.noSupplements')}</Empty>}
+      {items.map((s) => (
+        <Row key={s.id} icon={s.icon || '💊'} title={s.title}
+          sub={[s.dose, s.per_day > 1 ? t('gunum.perDayTimes', s.per_day) : null].filter(Boolean).join(' · ')}
+          end={<button type="button" className="btn btn--ghost btn--sm"
+            onClick={async () => { await repo.personal.removeSupplement(s.id); onDone(); }}>{t('common.delete')}</button>} />
+      ))}
+      <div className="spacer" />
+      <SupplementPicker mevcut={items} onPick={ekle} busyKey={busyKey} />
+      <div className="spacer" />
+      <TakviyeFormu repo={repo} t={t} onDone={onDone} />
+    </Card>
+  );
+}
+
+/** Katalogda olmayan takviye için yazarak ekleme. Izgaranın yerine değil, yanında. */
+function TakviyeFormu({ repo, t, onDone }) {
+  const [title, setTitle] = useState('');
+  const [dose, setDose] = useState('');
+  const [perDay, setPerDay] = useState('1');
+  const [busy, setBusy] = useState(false);
+
+  const gonder = async (e) => {
+    e.preventDefault();
+    if (!title.trim() || busy) return;
+    setBusy(true);
+    try {
+      await repo.personal.addSupplement({
+        title: title.trim(), icon: '💊', dose: dose.trim() || null,
+        per_day: Math.min(6, Math.max(1, Number(perDay) || 1)),
+      });
+      setTitle(''); setDose(''); setPerDay('1');
+      await onDone();
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <form onSubmit={gonder}>
+      <Field label={t('gunum.supplementTitle')}>
+        <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} />
+      </Field>
+      <div className="grid-2">
+        <Field label={t('gunum.dose')}>
+          <input className="input" placeholder={t('gunum.doseHint')} value={dose}
+            onChange={(e) => setDose(e.target.value)} />
+        </Field>
+        <Field label={t('gunum.perDay')}>
+          <select className="select" value={perDay} onChange={(e) => setPerDay(e.target.value)}>
+            {[1, 2, 3, 4].map((n) => <option key={n} value={String(n)}>{n}</option>)}
+          </select>
+        </Field>
+      </div>
+      <button className="btn btn--block" disabled={busy}>{t('gunum.addSupplement')}</button>
     </form>
   );
 }
