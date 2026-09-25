@@ -1,8 +1,9 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useApp } from '../../components/AppShell.jsx';
 import { Card, Field } from '../../components/ui.jsx';
 import { useT, useLocale, LanguageSwitch } from '../../lib/i18n/context.jsx';
+import { okuSonEposta, yazSonEposta } from '../../lib/sonGiris.js';
 
 /**
  * Giriş: e-posta + şifre. Bilinçli olarak sihirli bağlantı (magic link) YOK.
@@ -20,6 +21,10 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+
+  // E-posta hazır gelsin: statik export olduğu için ilk render sunucuda,
+  // depo ancak mount sonrası okunabiliyor.
+  useEffect(() => { setEmail((cur) => cur || okuSonEposta()); }, []);
 
   // Hane kurulum ekranı alanları
   const [name, setName] = useState('');
@@ -44,6 +49,8 @@ export default function LoginPage() {
     try {
       if (mode === 'signup') await repo.auth.signUp(email.trim(), password);
       else await repo.auth.signIn(email.trim(), password);
+      // Yalnızca başarılı girişten sonra: yanlış bir adres kalıcılaşmasın.
+      yazSonEposta(email);
       const s = await reload();
       // Hane varsa uygulamaya gir; yoksa bu sayfa kurulum adımına düşer.
       if (s?.household) location.href = '/';

@@ -1,13 +1,24 @@
-// YUVA service worker — app-shell cache-first, API network-only.
+// YUVA service worker — uygulama kabuğu önbelleği.
 //
-// 2026-09-21 düzeltmesi: eski sürüm gelen YANITI durumuna bakmadan
-// önbelleğe yazıyordu. Vercel bir an 502 döndürdüğünde o hata sayfası
-// kalıcı olarak önbelleğe giriyor, /_next/static/ cache-first olduğu için
-// telefon bir daha kendiliğinden düzelmiyordu (script MIME hatası). Artık
-// yalnızca başarılı (200) yanıtlar saklanıyor ve sürüm adı değişince eski
-// önbellek tamamen siliniyor.
-const CACHE = 'yuva-shell-v2';
-const SHELL = ['/', '/takvim/', '/para/', '/planlar/', '/aile/', '/ayarlar/', '/manifest.json'];
+// 2026-09-21: eski sürüm gelen YANITI durumuna bakmadan önbelleğe yazıyordu.
+// Vercel bir an 502 döndürdüğünde o hata sayfası kalıcı olarak önbelleğe
+// giriyordu. Artık yalnızca başarılı (200) yanıtlar saklanıyor.
+//
+// 2026-09-25 — ASIL SORUN BUYDU: telefondaki uygulama günlerce kendini
+// yenilemiyordu. Üç gün önce yayınlanan ekranlar bile görünmüyordu.
+// Service worker bir kez kurulduktan sonra kimse ona "yeni sürüm var mı?"
+// diye sormuyordu; ana ekrana eklenmiş uygulama açıldığında sayfa baştan
+// yüklenmediği için eski kopya çalışmaya devam ediyordu.
+//
+// Çözümün yarısı burada (sürüm adı değişti → eski önbellek tamamen silinir),
+// yarısı AppShell'de (açılışta ve öne her gelişte güncelleme sorulur, yeni
+// sürüm devralınca sayfa bir kez yenilenir).
+//
+// KURULUŞTA ARTIK SAYFA ÖNBELLEĞE ALINMIYOR. Eskiden altı sayfa kurulum
+// anında saklanıyordu; bu, uygulamanın ilk günkü HTML'iyle yaşlanmasına
+// zemin hazırlıyordu. Sayfalar zaten ziyaret edildikçe saklanıyor.
+const CACHE = 'yuva-shell-v3';
+const SHELL = ['/', '/manifest.json'];
 
 /** Yalnızca gerçekten işe yarayan yanıtlar saklanır. */
 const saklanabilir = (r) => r && r.ok && r.status === 200 && r.type === 'basic';
@@ -25,11 +36,17 @@ self.addEventListener('activate', (e) => {
   );
 });
 
+// Sayfa "hemen devral" diyebilsin diye.
+self.addEventListener('message', (e) => {
+  if (e.data === 'skipWaiting') self.skipWaiting();
+});
+
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return; // Supabase vb. → ağ
 
-  // Parmak izli statik dosyalar: önce önbellek, yoksa ağ (ve yalnızca sağlamsa sakla)
+  // Parmak izli statik dosyalar: önce önbellek, yoksa ağ. Güvenli, çünkü
+  // dosya adı içeriğin özetini taşır — içerik değişirse ad da değişir.
   if (url.pathname.startsWith('/_next/static/')) {
     e.respondWith((async () => {
       const c = await caches.open(CACHE);
@@ -42,7 +59,11 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // Sayfalar: önce ağ, düşerse önbellek
+  // sw.js ve manifest: her zaman ağdan. Güncellemeyi taşıyan dosyalar
+  // bunlar; önbellekten verilirse uygulama kendi yeniliğini göremez.
+  if (url.pathname === '/sw.js' || url.pathname === '/manifest.json') return;
+
+  // Sayfalar: önce ağ, düşerse önbellek.
   e.respondWith((async () => {
     try {
       const r = await fetch(e.request);

@@ -8,6 +8,7 @@ import { useT, useLocale, LanguageSwitch } from '../lib/i18n/context.jsx';
 import { fmtDay, fmtTime } from '../lib/dates.js';
 import { authScreen } from '../lib/authState.js';
 import { readStoredTheme, systemPrefersDark, resolveTheme, applyTheme } from '../lib/theme.js';
+import { yenilemeliMi, YENILENDI_ANAHTAR } from '../lib/surum.js';
 
 const AppCtx = createContext(null);
 export const useApp = () => useContext(AppCtx);
@@ -105,11 +106,103 @@ export default function AppShell({ children }) {
     };
   }, [resync]);
 
-  // PWA service worker
+  // YENİ YAYIN KONTROLÜ — telefonun günlerce eski sürümde kalmasının çaresi.
+  //
+  // Açık duran uygulama kendi derleme kimliğini bilir; sunucudaki
+  // version.json'a sorar. Farklıysa önbellekleri temizleyip bir kez yeniler.
+  // Service worker'ın kendi güncelleme yolu bu işi GÖRMEDİ (bkz. lib/surum.js).
+  //
+  // Açılışta ve uygulama öne her geldiğinde sorulur — telefonda uygulama
+  // günlerce açık kalabiliyor, tek soru anı açılış olmamalı.
   useEffect(() => {
-    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
-      navigator.serviceWorker.register('/sw.js').catch(() => {});
-    }
+    if (typeof window === 'undefined' || process.env.NODE_ENV !== 'production') return undefined;
+    let calisiyor = false;
+
+    const kontrol = async () => {
+      if (calisiyor || document.hidden) return;
+      calisiyor = true;
+      try {
+        const r = await fetch('/version.json', { cache: 'no-store' });
+        if (!r.ok) return;
+        const { build } = await r.json();
+        let son = null;
+        try { son = sessionStorage.getItem(YENILENDI_ANAHTAR); } catch { /* özel mod */ }
+        if (!yenilemeliMi(process.env.NEXT_PUBLIC_BUILD, build, son)) return;
+        try { sessionStorage.setItem(YENILENDI_ANAHTAR, build); } catch { /* özel mod */ }
+        // Önbellekler temizlenmezse yenileme yine eskisini getirebilir.
+        if ('caches' in window) {
+          const anahtarlar = await caches.keys();
+          await Promise.all(anahtarlar.map((k) => caches.delete(k)));
+        }
+        window.location.reload();
+      } catch { /* ağ yoksa sessizce geç */ }
+      finally { calisiyor = false; }
+    };
+
+    kontrol();
+    document.addEventListener('visibilitychange', kontrol);
+    return () => document.removeEventListener('visibilitychange', kontrol);
+  }, []);
+
+  // PWA service worker + GÜNCELLEME
+  //
+  // NEDEN: kayıt tek başına yetmiyordu. Telefondaki uygulama günlerce eski
+  // sürümde kaldı; üç gün önce yayınlanan ekranlar bile görünmüyordu. Ana
+  // ekrana eklenmiş uygulama açıldığında sayfa baştan yüklenmediği için eski
+  // service worker çalışmaya devam ediyor ve kimse ona yeni sürüm olup
+  // olmadığını sormuyordu.
+  //
+  // Üç parça: (1) açılışta ve uygulama öne her geldiğinde güncelleme sor,
+  // (2) bekleyen yeni sürüm varsa hemen devralmasını söyle, (3) devraldığı
+  // anda sayfayı BİR KEZ yenile.
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return undefined;
+    if (process.env.NODE_ENV !== 'production') return undefined;
+
+    let reg = null;
+    // Tek sefer koruması: controllerchange bazı tarayıcılarda birden fazla
+    // kez tetikleniyor. Kilitlemezsek sayfa sonsuz döngüye girer.
+    let yenilendi = false;
+
+    const devralsin = (worker) => {
+      if (worker && worker.state === 'installed' && navigator.serviceWorker.controller) {
+        worker.postMessage('skipWaiting');
+      }
+    };
+
+    // KAYIT ADRESİNE SÜRÜM EKLENİYOR — bu satır olmadan hiçbiri işe yaramıyor.
+    // sw.js dosyasının kendisi yayından yayına DEĞİŞMİYOR (statik dosya, kod
+    // değişse bile içeriği aynı). Tarayıcı güncellemeye bakarken yalnızca bu
+    // dosyayı karşılaştırdığı için "yeni sürüm yok" diyor, hiçbir şey olmuyor.
+    // Tarayıcıda denendi: sürümsüz kayıtla yeni yayın açık duran uygulamaya
+    // HİÇ ulaşmadı. Adrese derleme kimliğini koyunca kayıt adresi her yayında
+    // değişiyor, tarayıcı yeni bir worker kuruyor ve zincir işliyor.
+    navigator.serviceWorker.register(`/sw.js?v=${process.env.NEXT_PUBLIC_BUILD}`).then((r) => {
+      reg = r;
+      devralsin(r.waiting);
+      r.addEventListener('updatefound', () => {
+        const yeni = r.installing;
+        if (yeni) yeni.addEventListener('statechange', () => devralsin(yeni));
+      });
+      r.update().catch(() => {});
+    }).catch(() => {});
+
+    const onControllerChange = () => {
+      if (yenilendi) return;
+      yenilendi = true;
+      window.location.reload();
+    };
+    navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
+
+    // Uygulama öne geldiğinde tekrar sor: telefonda uygulama günlerce açık
+    // kalabiliyor, tek sorduğumuz an açılış anı olmamalı.
+    const onVisible = () => { if (!document.hidden && reg) reg.update().catch(() => {}); };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, []);
 
   const bump = useCallback(() => setTick((x) => x + 1), []);

@@ -126,6 +126,12 @@ export default function SettingsPage() {
 
       <Card title={t('settings.connect')} className="card--flat">
         <p className="faint">{repo.mode === 'supabase' ? t('settings.connectedHint') : t('settings.demoHint')}</p>
+        {/* Sürüm satırı: telefondaki kopyanın güncel olup olmadığını tahmin
+            etmek yerine okuyabilmek için. Bir kez tahmin etmeye çalışmak
+            günler kaybettirdi. */}
+        <p className="faint" style={{ marginTop: 'var(--sp-2)' }}>
+          {t('settings.version')}: <code>{process.env.NEXT_PUBLIC_BUILD}</code> · {process.env.NEXT_PUBLIC_BUILD_AT}
+        </p>
       </Card>
     </>
   );

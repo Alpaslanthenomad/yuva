@@ -1,36 +1,31 @@
 name: CI
 
-# NEDEN BU KADAR KISITLI — 2026-09-25
+# 2026-09-25 (aynı gün, ikinci düzeltme): DEPO ARTIK PUBLIC.
+# Public depoda GitHub Actions ücretsiz, yani push tetikleyicisi geri açıldı.
 #
-# Depo private. Private depoda her GitHub Actions calismasi hesabin aylik
-# dakika kotasindan dusuyor. Bu is akisi "on: [push, pull_request]" ile
-# kuruldugu icin HER push tam bir npm ci + test + build calistiriyordu.
-# 21-25 Eylul arasinda, bes gunden kisa surede 30 calisma birikti ve kota
-# tukendi: 22 Eylul 23:16'dan itibaren isler baslayamadan dusuyor
-# (5 saniyede "failure", hicbir adim calismadan).
+# Aynı gün önce kaldırılmıştı, sebebi şuydu: depo private iken her push tam
+# bir npm ci + test + build çalıştırıyordu; beş günden kısa sürede 30 çalışma
+# birikti ve kota tükendi (22 Eylül 23:16'dan itibaren işler başlayamadan
+# düşüyordu). Depo public olunca bu maliyet ortadan kalktı.
 #
-# Sebep kucuk ve sik commit'ler. Commit'leri buyutmek yerine TETIKLEYICIYI
-# kisitliyoruz, cunku kucuk commit'in kendisi degerli: bir hatayi iki dakikada
-# bulmayi sagliyor.
-#
-# push TETIKLEYICISI KALDIRILDI. Yerine: testler ve derleme her push ONCESI
-# gelistirme makinesinde calistiriliyor; yesil olmadan push edilmiyor. Boylece
-# gunluk calisma sifir dakika harciyor.
-#
-# Kalan tetikleyiciler:
-#   workflow_dispatch — Actions sekmesinden elle "Run workflow"
-#   pull_request      — yalnizca main'e acilan PR'da, yalnizca kodda degisiklik varsa
+# Tasarruf önlemleri YİNE DE DURUYOR — ücretsiz olması savurgan olmasını
+# gerektirmiyor ve depo tekrar private yapılırsa koruma hazır olsun:
+#   paths-ignore  — yalnızca metin değişen commit'ler iş çalıştırmaz
+#   concurrency   — art arda iki push, iki tam çalışma yerine bir tane harcar
+#   timeout       — takılan tek bir iş saatlerce koşamaz
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
   pull_request:
     branches: [main]
     paths-ignore:
       - '**.md'
       - 'docs/**'
-      - 'supabase/migrations/**'
 
-# Ust uste gelen calismalarda yalnizca sonuncusu kosar; eskisi iptal edilir.
-# Hizli ard arda iki push, iki tam calisma yerine bir tanesini harcar.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -38,8 +33,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # Varsayilan sinir 360 dakika. Takilan TEK bir is aylik kotanin tamamini
-    # yiyebilirdi; bu proje normalde 40 saniyede bitiyor.
+    # Varsayılan sınır 360 dakika. Bu proje normalde 40 saniyede bitiyor.
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
