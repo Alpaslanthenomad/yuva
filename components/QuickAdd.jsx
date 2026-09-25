@@ -91,12 +91,48 @@ export function ExpenseForm({ onDone, planId, txn, preset, checkoutListId }) {
   // yalnızca birer örnekti, başlık değil.
   const [hizliKat, setHizliKat] = useState('');
 
+  // KAYDETTİKTEN SONRA DÜZELTME. Kullanıcının şikâyeti: "Lider 40000 yazdım
+  // ama Eltit'ten harcamıştım, düzeltme şansı yok." Düzeltme aslında vardı —
+  // Para > İşlemler'de satıra dokununca açılıyordu — ama kaydettikten sonra
+  // Özet ekranında kalıyordun ve bunu hiçbir şey söylemiyordu. Hatanın
+  // farkına varıldığı an burasıdır; düzeltme de burada olmalı.
+  const [kaydedilen, setKaydedilen] = useState(null);
+  const [duzeltmeAcik, setDuzeltmeAcik] = useState(false);
+
   const pickQuick = (pr) => {
     if (quick === pr.key) { setQuick(''); setMerchant(''); setCategoryId(''); return; }
     setQuick(pr.key);
     setMerchant(presetName(pr, locale));
     setCategoryId(presetCategoryId(pr, categories));
   };
+  // Düzelt'e basıldıysa aynı form, bu kez o işlemin düzenleme kipinde.
+  if (kaydedilen && duzeltmeAcik) {
+    return <ExpenseForm txn={kaydedilen} onDone={onDone} />;
+  }
+
+  // Kaydedildi. Hatanın fark edildiği an burasıdır — düzeltme bir dokunuş
+  // uzakta. Önceden kaydettikten sonra Özet ekranında kalıyordun ve
+  // "İşlemler sekmesine geç, satıra dokun" diye bir şey söylenmiyordu.
+  if (kaydedilen) {
+    return (
+      <div>
+        <div className="banner" style={{ background: 'var(--color-brand-soft)', color: 'var(--color-brand-ink)' }}>
+          ✓ {t('quick.added')}: {kaydedilen.__ozet}
+        </div>
+        <div className="inline">
+          <button type="button" className="btn btn--outline" style={{ flex: 1 }}
+            onClick={() => setDuzeltmeAcik(true)}>
+            ✏️ {t('money.editTxn')}
+          </button>
+          <button type="button" className="btn" style={{ flex: 1 }}
+            onClick={() => { const o = kaydedilen.__ozet; setKaydedilen(null); onDone?.(o); }}>
+            {t('common.close')}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const cats = categories.filter((c) => c.kind === (kind === 'income' ? 'income' : 'expense'));
   const parents = cats.filter((c) => !c.parent_id);
   const childrenOf = (pid) => cats.filter((c) => c.parent_id === pid);
@@ -134,17 +170,24 @@ export function ExpenseForm({ onDone, planId, txn, preset, checkoutListId }) {
         await repo.transactions.update(txn.id, row);
         bump(); onDone?.(`${merchant || t('money.' + kind)} · ${amount} ${currency}`);
       } else {
+        let olusan = null;
         if (checkoutListId) {
           // Alışverişi harcamaya çevirme: harcama ve işaretlilerin temizlenmesi
           // tek işlemde olmalı, yoksa ikincisi patlayınca aynı alışveriş
           // yeniden çevrilebiliyor (0016).
           await repo.shopping.checkout(checkoutListId, row);
         } else {
-          await repo.transactions.create({ ...row, paid_by_member_id: me?.id, plan_id: planId || null });
+          olusan = await repo.transactions.create({ ...row, paid_by_member_id: me?.id, plan_id: planId || null });
         }
         remember({ accountId, categoryId });
-        bump(); onDone?.(`${merchant || t('money.' + kind)} · ${amount} ${currency}`);
+        bump();
+        const ozet = `${merchant || t('money.' + kind)} · ${amount} ${currency}`;
         setAmount(''); setMerchant('');
+        // Yeni satırı geri alabildiysek onay ekranını göster; alışverişi
+        // harcamaya çevirme yolu tek bir satır döndürmüyor, orada eski
+        // davranış sürüyor.
+        if (olusan && olusan.id) { setKaydedilen({ ...olusan, __ozet: ozet }); return; }
+        onDone?.(ozet);
       }
     } catch (ex) { setErr(ex.message); } finally { setBusy(false); }
   };

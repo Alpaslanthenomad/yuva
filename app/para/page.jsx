@@ -149,6 +149,9 @@ export default function MoneyPage() {
                 </select>
               </Field>
             </div>
+            {/* Satırların düzenlenebildiğini söylemek gerekiyordu: kullanıcı
+                yanlış girdiği bir harcamayı düzeltemediğini sandı. */}
+            <div className="faint" style={{ marginBottom: 'var(--sp-2)' }}>{t('money.editHint')}</div>
             <Card>
               {shown.map((x) => {
                 const c = categoryById(x.category_id);
