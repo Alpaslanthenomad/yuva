@@ -1,8 +1,46 @@
 name: CI
-on: [push, pull_request]
+
+# NEDEN BU KADAR KISITLI — 2026-09-25
+#
+# Depo private. Private depoda her GitHub Actions calismasi hesabin aylik
+# dakika kotasindan dusuyor. Bu is akisi "on: [push, pull_request]" ile
+# kuruldugu icin HER push tam bir npm ci + test + build calistiriyordu.
+# 21-25 Eylul arasinda, bes gunden kisa surede 30 calisma birikti ve kota
+# tukendi: 22 Eylul 23:16'dan itibaren isler baslayamadan dusuyor
+# (5 saniyede "failure", hicbir adim calismadan).
+#
+# Sebep kucuk ve sik commit'ler. Commit'leri buyutmek yerine TETIKLEYICIYI
+# kisitliyoruz, cunku kucuk commit'in kendisi degerli: bir hatayi iki dakikada
+# bulmayi sagliyor.
+#
+# push TETIKLEYICISI KALDIRILDI. Yerine: testler ve derleme her push ONCESI
+# gelistirme makinesinde calistiriliyor; yesil olmadan push edilmiyor. Boylece
+# gunluk calisma sifir dakika harciyor.
+#
+# Kalan tetikleyiciler:
+#   workflow_dispatch — Actions sekmesinden elle "Run workflow"
+#   pull_request      — yalnizca main'e acilan PR'da, yalnizca kodda degisiklik varsa
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'supabase/migrations/**'
+
+# Ust uste gelen calismalarda yalnizca sonuncusu kosar; eskisi iptal edilir.
+# Hizli ard arda iki push, iki tam calisma yerine bir tanesini harcar.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Varsayilan sinir 360 dakika. Takilan TEK bir is aylik kotanin tamamini
+    # yiyebilirdi; bu proje normalde 40 saniyede bitiyor.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
