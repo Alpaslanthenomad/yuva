@@ -68,6 +68,58 @@ test('gelir kategorileri asla seçilmez', () => {
   assert.equal(presetCategoryId(by('uber'), sadeceGelir), '');
 });
 
+// Hanenin GERÇEK kategori yapısı (Supabase'den okundu): Market üst kategori,
+// altında Gıda / Temizlik / Kişisel bakım.
+const GERCEK = [
+  { id: 'm',  name: 'Market',            kind: 'expense', parent_id: null },
+  { id: 'm1', name: 'Gıda',              kind: 'expense', parent_id: 'm' },
+  { id: 'm2', name: 'Temizlik',          kind: 'expense', parent_id: 'm' },
+  { id: 'm3', name: 'Kişisel bakım',     kind: 'expense', parent_id: 'm' },
+  { id: 'e',  name: 'Eğlence & Sosyal',  kind: 'expense', parent_id: null },
+  { id: 's',  name: 'Sağlık',            kind: 'expense', parent_id: null },
+  { id: 's3', name: 'Eczane',            kind: 'expense', parent_id: 's' },
+];
+
+test('MARKET SEÇİMLERİ VAR — en sık girilen harcama buydu ve eksikti', () => {
+  // Kullanıcının uyarısı: hazır seçimlerde ulaşım ve restoran vardı, market
+  // yoktu. "Lider'e 40.000 verdik" üç dokunuşta kaydedilebilmeli.
+  const market = EXPENSE_PRESETS.filter((p) => p.group === 'market');
+  assert.ok(market.length >= 5, 'market seçimi yok ya da çok az');
+  // Listede en başta olmalı: en sık dokunulan başta.
+  assert.equal(EXPENSE_PRESETS[0].group, 'market');
+});
+
+test('market seçimleri ÜST kategori "Market"e düşer, "Gıda" altına değil', () => {
+  // Bir market alışverişi gıdayla birlikte temizlik ve kişisel bakım da
+  // içerir; tek bir alt kategoriye yazmak bütçe kırılımını yanıltır.
+  for (const p of EXPENSE_PRESETS.filter((x) => x.group === 'market')) {
+    assert.equal(presetCategoryId(p, GERCEK), 'm', `${p.tr} yanlış kategoriye düştü`);
+  }
+});
+
+test('spor ve eczane doğru yere düşer', () => {
+  assert.equal(presetCategoryId(by('sport'), GERCEK), 'e');
+  assert.equal(presetCategoryId(by('pharmacy'), GERCEK), 's3');
+});
+
+test('HİÇBİR SEÇİM BOŞTA KALMIYOR — hanenin gerçek kategorileriyle', () => {
+  const bosta = EXPENSE_PRESETS.filter((p) => !presetCategoryId(p, [
+    ...GERCEK,
+    { id: 'u',  name: 'Ulaşım',     kind: 'expense', parent_id: null },
+    { id: 'u1', name: 'Yakıt',      kind: 'expense', parent_id: 'u' },
+    { id: 'u2', name: 'Toplu taşıma', kind: 'expense', parent_id: 'u' },
+    { id: 'u3', name: 'Taksi / Uber', kind: 'expense', parent_id: 'u' },
+    { id: 'u4', name: 'Araç bakım & sigorta', kind: 'expense', parent_id: 'u' },
+    { id: 'u5', name: 'Otopark & Geçiş', kind: 'expense', parent_id: 'u' },
+    { id: 'y',  name: 'Yeme-İçme',  kind: 'expense', parent_id: null },
+    { id: 'y1', name: 'Restoran',   kind: 'expense', parent_id: 'y' },
+    { id: 'y2', name: 'Kafe',       kind: 'expense', parent_id: 'y' },
+    { id: 'y3', name: 'Sipariş',    kind: 'expense', parent_id: 'y' },
+    { id: 'sy', name: 'Seyahat',    kind: 'expense', parent_id: null },
+  ])).map((p) => p.tr);
+  assert.deepEqual(bosta, []);
+});
+
 test('presetName: dile göre ad', () => {
   assert.equal(presetName(by('bus'), 'tr'), 'Otobüs');
   assert.equal(presetName(by('bus'), 'es-CL'), 'Bus');

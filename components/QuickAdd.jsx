@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useApp } from './AppShell.jsx';
+import ShoppingPicker from './ShoppingPicker.jsx';
 import { Sheet, Field } from './ui.jsx';
 import { useT, useLocale } from '../lib/i18n/context.jsx';
 import { parseAmount, minorToDecimal, CURRENCY_CODES, CURRENCIES } from '../lib/money.js';
@@ -29,7 +30,7 @@ export default function QuickAdd({ onClose, initial = 'expense' }) {
       {tab === 'expense' && <ExpenseForm onDone={(m) => setDone(m)} />}
       {tab === 'event' && <EventForm onDone={(m) => setDone(m)} />}
       {tab === 'task' && <TaskForm onDone={(m) => setDone(m)} />}
-      {tab === 'shopping' && <ShoppingForm onDone={(m) => setDone(m)} />}
+      {tab === 'shopping' && <ShoppingQuickPick onDone={(m) => setDone(m)} />}
     </Sheet>
   );
 }
@@ -360,7 +361,7 @@ export function TaskForm({ onDone, planId }) {
   );
 }
 
-export function ShoppingForm({ onDone, listId }) {
+export function ShoppingForm({ onDone, listId, autoFocus = false }) {
   const { repo, bump } = useApp();
   const t = useT();
   const [name, setName] = useState('');
@@ -371,8 +372,49 @@ export function ShoppingForm({ onDone, listId }) {
   };
   return (
     <form onSubmit={submit} className="inline" style={{ flexWrap: 'nowrap' }}>
-      <input className="input" autoFocus placeholder={t('quick.shoppingItem')} value={name} onChange={(e) => setName(e.target.value)} />
+      <input className="input" autoFocus={autoFocus} placeholder={t('quick.shoppingItem')} value={name} onChange={(e) => setName(e.target.value)} />
       <button className="btn">{t('common.add')}</button>
     </form>
+  );
+}
+
+/**
+ * Hızlı ekle > Alışveriş: EMOJİ IZGARASI ÖNCE, yazı kutusu altta.
+ *
+ * NEDEN DEĞİŞTİ: ızgara yalnızca Aile > Alışveriş ekranında, bir düğmenin
+ * arkasındaydı. Kullanıcı onu bir kez buldu, sonra en çok kullanılan yere —
+ * alttaki "+" düğmesine — bastığında karşısında yine yazı kutusu çıktı ve
+ * özelliğin kaybolduğunu sandı. İsteğin kendisi zaten "yazma işi olmasın"dı;
+ * en sık kullanılan girişte yazı kutusu bırakmak o isteği boşa çıkarıyordu.
+ *
+ * Yazı kutusu SİLİNMEDİ, altta duruyor: katalogda olmayan bir şey (bir marka,
+ * bir ilaç adı) yazmanın yolu kapanmamalı.
+ *
+ * Klavye artık kendiliğinden açılmıyor: açılsaydı ızgarayı örterdi.
+ */
+export function ShoppingQuickPick({ onDone }) {
+  const { repo, tick } = useApp();
+  const [listId, setListId] = useState(null);
+  const [items, setItems] = useState([]);
+
+  useEffect(() => {
+    let iptal = false;
+    (async () => {
+      try {
+        const lists = await repo.shopping.lists();
+        const l = (lists || [])[0];
+        const its = await repo.shopping.items(l?.id);
+        if (!iptal) { setListId(l?.id || null); setItems(its || []); }
+      } catch { /* liste okunamazsa ızgara yine çalışır; eklemede liste DB'de çözülüyor */ }
+    })();
+    return () => { iptal = true; };
+  }, [repo, tick]);
+
+  return (
+    <>
+      <ShoppingPicker listId={listId} items={items} />
+      <div className="spacer" />
+      <ShoppingForm onDone={onDone} listId={listId} />
+    </>
   );
 }
