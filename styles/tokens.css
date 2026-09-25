@@ -59,6 +59,24 @@
   --safe-t: env(safe-area-inset-top, 0px);
 
   --max-w: 720px;
+
+  /* Günün karesi — fotoğraf yokken And dağları çizimi. Bir manzara resmi
+     olduğu için temadan bağımsız; koyu kipte de aynı gökyüzü. */
+  --scene-dawn-sky-1: #F3B99A;  --scene-dawn-sky-2: #FBE3C8;
+  --scene-dawn-far: #C8918F;    --scene-dawn-near: #7A5568;  --scene-dawn-sun: #FFE7B8;
+  --scene-day-sky-1: #7FBDE6;   --scene-day-sky-2: #D8EEF8;
+  --scene-day-far: #9DB4C6;     --scene-day-near: #56768A;   --scene-day-sun: #FFF3C4;
+  --scene-dusk-sky-1: #3F3C70;  --scene-dusk-sky-2: #EE9A63;
+  --scene-dusk-far: #85628A;    --scene-dusk-near: #3C3050;  --scene-dusk-sun: #FFC784;
+  --scene-night-sky-1: #0D1530; --scene-night-sky-2: #2A3A63;
+  --scene-night-far: #34435F;   --scene-night-near: #19223B; --scene-night-sun: #EEEBDD;
+  --scene-snow: #F7F7F2;
+  --scene-ground: rgba(0,0,0,.18);
+  --scene-scrim: rgba(0,0,0,.55);
+  --scene-ink: #FFFFFF;
+  --scene-shadow: rgba(0,0,0,.35);
+  --scene-chip: rgba(0,0,0,.35);
+  --lightbox-bg: rgba(0,0,0,.92);
 }
 
 /* ---------------------------------------------------------------------------

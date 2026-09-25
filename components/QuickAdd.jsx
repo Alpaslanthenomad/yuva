@@ -4,7 +4,7 @@ import { useApp } from './AppShell.jsx';
 import ShoppingPicker from './ShoppingPicker.jsx';
 import { Sheet, Field } from './ui.jsx';
 import { useT, useLocale } from '../lib/i18n/context.jsx';
-import { parseAmount, minorToDecimal, CURRENCY_CODES, CURRENCIES } from '../lib/money.js';
+import { parseAmount, minorToDecimal, formatMoney, CURRENCY_CODES, CURRENCIES } from '../lib/money.js';
 import { today, buildRRule, freqKeyOf } from '../lib/dates.js';
 import { EXPENSE_PRESETS, presetName, presetCategoryId } from '../lib/expenseCatalog.js';
 
@@ -98,6 +98,34 @@ export function ExpenseForm({ onDone, planId, txn, preset, checkoutListId }) {
   // farkına varıldığı an burasıdır; düzeltme de burada olmalı.
   const [kaydedilen, setKaydedilen] = useState(null);
   const [duzeltmeAcik, setDuzeltmeAcik] = useState(false);
+
+  // ALIŞKANLIKTAN ÖNERİ (0024). "Lider · 40.000" gibi, son aylarda en az iki
+  // kez yapılmış harcamalar. Dokununca tutar, yer, kategori ve hesap birlikte
+  // dolar; tek iş Kaydet'e basmak. Yeni harcamada ve alışverişi harcamaya
+  // çevirmiyorken gösteriliyor; düzenlemede anlamı yok.
+  const [oneriler, setOneriler] = useState([]);
+  const [seciliOneri, setSeciliOneri] = useState(-1);
+  useEffect(() => {
+    if (editing || checkoutListId || !repo.suggest) return undefined;
+    let iptal = false;
+    repo.suggest.expenses().then((r) => { if (!iptal) setOneriler(Array.isArray(r) ? r : []); })
+      .catch(() => { if (!iptal) setOneriler([]); });
+    return () => { iptal = true; };
+  }, [repo, editing, checkoutListId]);
+
+  const oneriSec = (o, i) => {
+    if (seciliOneri === i) {
+      setSeciliOneri(-1); setAmount(''); setMerchant(''); setCategoryId(''); setHizliKat('');
+      return;
+    }
+    setSeciliOneri(i);
+    setAmount(String(o.amount));
+    setMerchant(o.merchant || '');
+    setCategoryId(o.category_id || '');
+    setHizliKat(''); setQuick('');
+    if (o.account_id && accounts.some((a) => a.id === o.account_id)) setAccountId(o.account_id);
+    if (o.currency) setCurrency(o.currency);
+  };
 
   const pickQuick = (pr) => {
     if (quick === pr.key) { setQuick(''); setMerchant(''); setCategoryId(''); return; }
@@ -206,7 +234,22 @@ export function ExpenseForm({ onDone, planId, txn, preset, checkoutListId }) {
           <button type="button" key={k} className={'seg__btn' + (kind === k ? ' seg__btn--active' : '')} style={{ flex: 1 }} onClick={() => setKind(k)}>{t('money.' + k)}</button>
         ))}
       </div>
-      <input className="input input--amount" inputMode="decimal" placeholder="0" autoFocus value={amount} onChange={(e) => setAmount(e.target.value)} aria-label={t('money.amount')} />
+      {kind === 'expense' && oneriler.length > 0 && (
+        <>
+          <div className="oneri__baslik">{t('money.suggestTitle')}</div>
+          <div className="oneri">
+            {oneriler.map((o, i) => (
+              <button type="button" key={o.merchant + i}
+                className={'oneri__item' + (seciliOneri === i ? ' oneri__item--on' : '')}
+                aria-pressed={seciliOneri === i} onClick={() => oneriSec(o, i)}>
+                <span className="oneri__ust">{o.category_icon || '🧾'} {o.merchant}</span>
+                <span className="oneri__alt">{formatMoney(o.amount, o.currency)} · {t('money.suggestUses', o.uses)}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+      <input className="input input--amount" inputMode="decimal" placeholder="0" autoFocus={oneriler.length === 0} value={amount} onChange={(e) => { setAmount(e.target.value); setSeciliOneri(-1); }} aria-label={t('money.amount')} />
       <div className="chips" style={{ margin: 'var(--sp-2) 0 var(--sp-4)', justifyContent: 'center' }}>
         {CURRENCY_CODES.map((c) => (
           <button type="button" key={c} className={'chip' + (currency === c ? ' chip--active' : '')} onClick={() => setCurrency(c)} title={t('currencies.' + c)}>{CURRENCIES[c].flag} {c}</button>

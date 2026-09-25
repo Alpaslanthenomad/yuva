@@ -307,6 +307,8 @@ ul { margin: 0; padding: 0; list-style: none; }
 /* Markette alınmış kalem: ızgarada soluk ve dokunulamaz. Listedeki onay
    kutusundan çıkarılır — buradan yanlışlıkla düşürmek, markette unutmaktır. */
 .picker__item--done { opacity: 0.55; }
+/* "Bitmiş olabilir" sekmesinde ürünün altında tipik aralık. */
+.picker__sub { font-size: 10px; font-weight: 500; color: var(--color-text-3); }
 
 /* ---------- Aylık eğilim grafiği (Para › Rapor) ----------
    Kütüphane yok: statik dışa aktarımda her kütüphane paket boyutu demek ve
@@ -346,3 +348,76 @@ ul { margin: 0; padding: 0; list-style: none; }
 .nav__item { min-width: 0; padding-left: 1px; padding-right: 1px; }
 .nav__item > span:last-child { font-size: 10px; letter-spacing: -.02em; white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis; max-width: 100%; text-align: center; }
+
+
+/* ---------------------------------------------------------------------------
+   Günün karesi (Bugün ekranının tepesi)
+   --------------------------------------------------------------------------- */
+.hero {
+  position: relative; width: 100%; aspect-ratio: 16 / 10; max-height: 280px;
+  border-radius: var(--radius-lg); overflow: hidden; margin-bottom: var(--sp-4);
+  background: var(--color-surface-2); box-shadow: var(--shadow-1);
+}
+.hero__tap { position: absolute; inset: 0; padding: 0; border: 0; background: none; cursor: zoom-in; }
+.hero__img, .hero__scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; object-fit: cover; }
+.hero__img { opacity: 0; transition: opacity .5s ease; }
+.hero__img--ready { opacity: 1; animation: hero-yavas 24s ease-out forwards; }
+@keyframes hero-yavas { from { transform: scale(1); } to { transform: scale(1.06); } }
+@media (prefers-reduced-motion: reduce) { .hero__img--ready { animation: none; } }
+.hero__scrim { position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(to top, var(--scene-scrim), transparent 62%); }
+.hero__text { position: absolute; left: var(--sp-4); right: var(--sp-4); bottom: var(--sp-3);
+  color: var(--scene-ink); pointer-events: none; }
+.hero__title { margin: 0; font-size: var(--fs-2xl); font-weight: 700; line-height: 1.15;
+  text-shadow: 0 1px 8px var(--scene-shadow); }
+.hero__sub { margin-top: 2px; font-size: var(--fs-sm); opacity: .92; text-shadow: 0 1px 6px var(--scene-shadow); }
+.hero__chip {
+  position: absolute; top: var(--sp-3); right: var(--sp-3); min-height: 32px;
+  padding: 0 var(--sp-3); border: 0; border-radius: var(--radius-pill);
+  background: var(--scene-chip); color: var(--scene-ink); font-size: var(--fs-xs); font-weight: 600;
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); cursor: pointer;
+}
+/* Dokunma hedefi görünenden büyük: küçük düğme, 44 px'lik parmak alanı. */
+.hero__chip::after { content: ''; position: absolute; inset: -8px; }
+
+.sahne--dawn  { --sky-1: var(--scene-dawn-sky-1);  --sky-2: var(--scene-dawn-sky-2);  --far: var(--scene-dawn-far);  --near: var(--scene-dawn-near);  --sun: var(--scene-dawn-sun); }
+.sahne--day   { --sky-1: var(--scene-day-sky-1);   --sky-2: var(--scene-day-sky-2);   --far: var(--scene-day-far);   --near: var(--scene-day-near);   --sun: var(--scene-day-sun); }
+.sahne--dusk  { --sky-1: var(--scene-dusk-sky-1);  --sky-2: var(--scene-dusk-sky-2);  --far: var(--scene-dusk-far);  --near: var(--scene-dusk-near);  --sun: var(--scene-dusk-sun); }
+.sahne--night { --sky-1: var(--scene-night-sky-1); --sky-2: var(--scene-night-sky-2); --far: var(--scene-night-far); --near: var(--scene-night-near); --sun: var(--scene-night-sun); }
+.sahne__uzak { fill: var(--far); }
+.sahne__yakin { fill: var(--near); }
+.sahne__kar { fill: var(--scene-snow); opacity: .9; }
+.sahne__gunes { fill: var(--sun); opacity: .95; }
+.sahne__yildiz circle { fill: var(--scene-snow); opacity: .8; }
+.sahne__on { fill: var(--scene-ground); }
+
+.lightbox { position: fixed; inset: 0; z-index: 60; background: var(--lightbox-bg);
+  display: flex; align-items: center; justify-content: center; padding: var(--sp-4); cursor: zoom-out; }
+.lightbox img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: var(--radius-md); }
+
+.album-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-2); }
+.album-grid__item { position: relative; aspect-ratio: 1; border-radius: var(--radius-md); overflow: hidden; background: var(--color-surface-2); }
+.album-grid__item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.album-grid__del {
+  position: absolute; top: 4px; right: 4px; min-width: 32px; height: 32px; padding: 0 var(--sp-2);
+  border: 0; border-radius: var(--radius-pill); background: var(--scene-chip); color: var(--scene-ink);
+  font-size: var(--fs-xs); font-weight: 700; cursor: pointer;
+}
+.album-grid__del--ask { background: var(--color-danger); }
+
+/* Akıllı öneri düğmeleri (harcama ve alışveriş): yatay kaydırılan tek sıra. */
+.oneri { display: flex; gap: var(--sp-2); overflow-x: auto; padding-bottom: var(--sp-1); margin-bottom: var(--sp-3);
+  scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.oneri::-webkit-scrollbar { display: none; }
+.oneri__item {
+  flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  min-height: var(--tap); padding: var(--sp-2) var(--sp-3); border-radius: var(--radius-md);
+  border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text);
+  text-align: left; cursor: pointer;
+}
+.oneri__item:active { background: var(--color-brand-soft); }
+.oneri__item--on { background: var(--color-brand-soft); border-color: var(--color-brand); color: var(--color-brand-ink); }
+.oneri__ust { font-size: var(--fs-sm); font-weight: 600; white-space: nowrap; }
+.oneri__alt { font-size: var(--fs-xs); color: var(--color-text-2); white-space: nowrap; }
+.oneri__baslik { font-size: var(--fs-xs); font-weight: 600; color: var(--color-text-2);
+  text-transform: uppercase; letter-spacing: .04em; margin-bottom: var(--sp-2); }

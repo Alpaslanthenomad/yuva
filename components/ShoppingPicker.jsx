@@ -6,6 +6,7 @@ import { useT, useLocale } from '../lib/i18n/context.jsx';
 import { SHOPPING_GROUPS, SHOPPING_CATALOG, catalogName, normalizeName } from '../lib/shoppingCatalog.js';
 
 const FAV = 'fav';   // sanal reyon: sık alınanlar
+const BITTI = 'restock';   // sanal reyon: bitmiş olabilecekler (0024)
 
 /**
  * Yazmadan sepet: reyon seç, ürüne dokun, listeye düşsün.
@@ -28,7 +29,7 @@ export default function ShoppingPicker({ listId, items = [] }) {
   const t = useT();
   const { locale } = useLocale();
   const es = String(locale || '').startsWith('es');
-  const [group, setGroup] = useState(FAV);
+  const [group, setGroup] = useState(BITTI);
   const [busy, setBusy] = useState(null);
   const [favs, setFavs] = useState([]);   // [{catalog_key, uses}] — DB'de sayılıyor (0019)
   // Sunucu yanıtı gelene kadar ekranda tutulan geçici durum.
@@ -41,6 +42,18 @@ export default function ShoppingPicker({ listId, items = [] }) {
     repo.shopping.favorites?.(12)
       .then((r) => { if (!iptal) setFavs(Array.isArray(r) ? r : []); })
       .catch(() => { if (!iptal) setFavs([]); });
+    return () => { iptal = true; };
+  }, [repo]);
+
+  // "Bitmiş olabilir": her ürünün tipik yazılma aralığından hesaplanıyor
+  // (0024). Varsa ilk sekme bu — alışverişe başlarken en çok işe yarayan soru
+  // "ne bitti?" sorusu.
+  const [bitti, setBitti] = useState([]);
+  useEffect(() => {
+    let iptal = false;
+    repo.suggest?.restock()
+      .then((r) => { if (!iptal) setBitti(Array.isArray(r) ? r : []); })
+      .catch(() => { if (!iptal) setBitti([]); });
     return () => { iptal = true; };
   }, [repo]);
 
@@ -77,13 +90,20 @@ export default function ShoppingPicker({ listId, items = [] }) {
     .map((k) => SHOPPING_CATALOG.find((x) => x.key === k))
     .filter(Boolean);
   // Sanal sekmenin adı i18n'den; reyon adları katalogda (veri, arayüz metni değil).
-  const tabs = favRows.length
-    ? [{ key: FAV, emoji: '⭐', label: t('shopping.favorites') }, ...SHOPPING_GROUPS]
-    : SHOPPING_GROUPS;
+  const bittiRows = bitti
+    .map((b) => SHOPPING_CATALOG.find((x) => x.key === b.catalog_key))
+    .filter(Boolean);
+  const tabs = [
+    ...(bittiRows.length ? [{ key: BITTI, emoji: '🔁', label: t('shopping.restockTitle') }] : []),
+    ...(favRows.length ? [{ key: FAV, emoji: '⭐', label: t('shopping.favorites') }] : []),
+    ...SHOPPING_GROUPS,
+  ];
   const tabLabel = (x) => x.label || (es ? x.es : x.tr);
   // Favori yoksa ilk sekme meyve olsun; boş ızgara açılışı kötü karşılama.
   const activeTab = tabs.some((x) => x.key === group) ? group : tabs[0].key;
-  const rows = activeTab === FAV ? favRows : SHOPPING_CATALOG.filter((x) => x.group === activeTab);
+  const rows = activeTab === BITTI ? bittiRows
+    : activeTab === FAV ? favRows : SHOPPING_CATALOG.filter((x) => x.group === activeTab);
+  const araligi = (key) => bitti.find((b) => b.catalog_key === key)?.every_days;
   const pickedCount = SHOPPING_CATALOG.filter(isPicked).length;
 
   return (
@@ -113,6 +133,9 @@ export default function ShoppingPicker({ listId, items = [] }) {
               onClick={() => toggle(item)}>
               <span className="picker__emoji" aria-hidden="true">{item.emoji}</span>
               <span className="picker__name">{catalogName(item, locale)}</span>
+              {activeTab === BITTI && araligi(item.key) && (
+                <span className="picker__sub">{t('shopping.restockEvery', araligi(item.key))}</span>
+              )}
               {picked && <span className="picker__tick" aria-hidden="true">{done ? '🛒' : '✓'}</span>}
             </button>
           );

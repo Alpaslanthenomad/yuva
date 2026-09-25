@@ -8,6 +8,9 @@ import { useT } from '../lib/i18n/context.jsx';
 import { today, periodOf, fmtDayLong, fmtTime, relativeLabel, weekDays, dowNames, fromISODate, fmtDay, nextOccurrence, daysBetween, dayInRange } from '../lib/dates.js';
 import { formatMoney, budgetState, dailyAllowance } from '../lib/money.js';
 import { holidayMap } from '../lib/holidays.js';
+import GununKaresi from '../components/GununKaresi.jsx';
+import { selamAnahtari } from '../lib/album.js';
+import { SHOPPING_CATALOG, catalogName, normalizeName } from '../lib/shoppingCatalog.js';
 
 export default function TodayPage() {
   const app = useApp();
@@ -19,7 +22,17 @@ export default function TodayPage() {
   const [justDone, setJustDone] = useState([]);
   const [notifOpen, setNotifOpen] = useState(false);
   const [history, setHistory] = useState(false);
+  // "Bitmiş olabilir" (0024) — listeye dönüşmeden, alışveriş satırında bir
+  // hatırlatma olarak.
+  const [bitti, setBitti] = useState([]);
   const T = today();
+
+  useEffect(() => {
+    if (!household || !repo.suggest) return undefined;
+    let iptal = false;
+    repo.suggest.restock().then((r) => { if (!iptal) setBitti(Array.isArray(r) ? r : []); }).catch(() => {});
+    return () => { iptal = true; };
+  }, [repo, household, tick]);
 
   useEffect(() => {
     if (!household) return;
@@ -42,6 +55,13 @@ export default function TodayPage() {
   const bs = total ? budgetState(total.spent, total.budget) : null;
   const holidays = holidayMap(Number(T.slice(0, 4)), household.holiday_countries, locale);
   const openShopping = shopping.filter((s) => !s.is_checked);
+  // Listede zaten olanı "bitmiş olabilir" diye ayrıca söyleme.
+  const listede = new Set(openShopping.map((x) => normalizeName(x.name)));
+  const bittiAdlari = bitti
+    .map((b) => SHOPPING_CATALOG.find((x) => x.key === b.catalog_key))
+    .filter(Boolean)
+    .filter((x) => !listede.has(normalizeName(x.tr)) && !listede.has(normalizeName(x.es)))
+    .map((x) => catalogName(x, locale));
   // Geciken işi bugünkü işle aynı kutuya koymak, gecikmeyi görünmez yapıyordu.
   const openTasks = agenda.tasks.filter((k) => !k.is_done);
   const overdueTasks = openTasks.filter((k) => k.due_on && k.due_on < T);
@@ -65,13 +85,10 @@ export default function TodayPage() {
 
   return (
     <>
-      <div className="page-head">
-        <div>
-          <h1 className="h1">{t('today.greeting', me?.display_name || '')}</h1>
-          <div className="page-head__sub">{fmtDayLong(T)}{holidays[T] ? ` · 🎉 ${holidays[T][0].name}` : ''}</div>
-        </div>
-        <Avatars members={members} />
-      </div>
+      {/* Başlık artık günün karesinin üstünde: selam saate göre değişiyor,
+          tarih ve varsa bayram altında. */}
+      <GununKaresi title={t(selamAnahtari(new Date().getHours()), me?.display_name || '')}
+        sub={`${fmtDayLong(T)}${holidays[T] ? ` · 🎉 ${holidays[T][0].name}` : ''}`} />
 
       {isFirstRun ? <StartCard onQuick={app.openQuick} /> : <>
 
@@ -194,10 +211,13 @@ export default function TodayPage() {
           kalıyordu. Liste artık tek yerde, Aile ekranının alışveriş
           sekmesinde; burada yalnızca bekleyen olduğunu söyleyen bir satır
           duruyor ve dokununca oraya gidiyor. */}
-      {openShopping.length > 0 && (
+      {(openShopping.length > 0 || bittiAdlari.length > 0) && (
         <Card className="card--flat">
-          <Row icon="🛒" title={t('today.shopping')}
-            sub={t('today.itemsLeft', openShopping.length)}
+          <Row icon="🛒" title={openShopping.length > 0 ? t('today.shopping') : t('shopping.restockTitle')}
+            sub={[
+              openShopping.length > 0 ? t('today.itemsLeft', openShopping.length) : null,
+              bittiAdlari.length > 0 ? t('shopping.restockHome', bittiAdlari.slice(0, 3).join(', ')) : null,
+            ].filter(Boolean).join(' · ')}
             end={<span className="faint">→</span>}
             onClick={() => { window.location.href = '/aile/?sekme=shopping'; }} />
         </Card>
@@ -284,7 +304,8 @@ function StartCard({ onQuick }) {
 function TodaySkeleton() {
   return (
     <div aria-busy="true">
-      <div className="skel skel--title" />
+      {/* Günün karesi yer tutucusu: fotoğraf gelince sayfa zıplamasın. */}
+      <div className="skel skel--card" style={{ aspectRatio: '16 / 10', maxHeight: 280 }} />
       {[96, 132, 120].map((h, i) => <div key={i} className="skel skel--card" style={{ height: h }} />)}
     </div>
   );
@@ -300,21 +321,27 @@ function RitimKarti() {
   const t = useT();
   const [gun, setGun] = useState(null);
   const [hedefler, setHedefler] = useState([]);
+  const [takviye, setTakviye] = useState([]);
 
   useEffect(() => {
     if (!household) return undefined;
     let iptal = false;
     (async () => {
       try {
-        const [d, g] = await Promise.all([repo.personal.day(), repo.personal.goals()]);
-        if (!iptal) { setGun(d); setHedefler(g || []); }
+        const [d, g, sp] = await Promise.all([
+          repo.personal.day(), repo.personal.goals(),
+          repo.personal.supplements ? repo.personal.supplements() : null,
+        ]);
+        if (!iptal) { setGun(d); setHedefler(g || []); setTakviye(sp?.items || []); }
       } catch { /* kişisel veri okunamazsa Bugün'ün geri kalanı çalışmaya devam etsin */ }
     })();
     return () => { iptal = true; };
   }, [repo, household, tick]);
 
   const bloklar = gun?.blocks || [];
-  if (bloklar.length === 0 && hedefler.length === 0) return null;
+  // Hatırlatma: bugün alınmamış takviyeler. Hepsi alındıysa satır yok.
+  const bekleyen = takviye.filter((x) => !x.done);
+  if (bloklar.length === 0 && hedefler.length === 0 && bekleyen.length === 0) return null;
 
   const d = new Date();
   const su = d.getHours() * 60 + d.getMinutes();
@@ -337,6 +364,11 @@ function RitimKarti() {
           end={siradaki
             ? <span className="faint">{t('gunum.next')}: {String(siradaki.starts_at).slice(0, 5)}</span>
             : null} />
+      )}
+      {bekleyen.length > 0 && (
+        <Row icon="💊" title={t('today.supplementsDue', bekleyen.length)}
+          sub={bekleyen.slice(0, 3).map((x) => x.title).join(', ') + (bekleyen.length > 3 ? '…' : '')}
+          end={<Link className="faint" href="/gunum/">→</Link>} />
       )}
       {ort !== null && (
         <>
