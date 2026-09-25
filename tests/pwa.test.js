@@ -84,6 +84,17 @@ test('SONSUZ YENİLEME DÖNGÜSÜ KORUMASI VAR', () => {
   assert.match(shell, /addEventListener\('controllerchange'/);
 });
 
+test('YAYIN KOMUTU SABİTLENMİŞ — postbuild atlanmasın', () => {
+  // Vercel, Next.js projesinde varsayılan olarak `next build` komutunu
+  // DOĞRUDAN çalıştırıyor, `npm run build` değil. O zaman npm'in postbuild
+  // adımı atlanıyor ve version.json hiç üretilmiyor; yayında 404 dönüyordu,
+  // yani uygulamanın yeni sürümü fark etme yeteneği sessizce çalışmıyordu.
+  const v = JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'));
+  assert.equal(v.buildCommand, 'npm run build');
+  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  assert.match(pkg.scripts.postbuild, /yayin-surumu/);
+});
+
 test('sürüm bilgisi derlemeye gömülüyor ve ekranda gösteriliyor', () => {
   const cfg = readFileSync(new URL('../next.config.mjs', import.meta.url), 'utf8');
   assert.match(cfg, /NEXT_PUBLIC_BUILD/);
