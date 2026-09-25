@@ -84,6 +84,13 @@ export function ExpenseForm({ onDone, planId, txn, preset, checkoutListId }) {
    * yanlış dokunan, iki alanı elle silmek zorunda kalmasın.
    * Kategori eşleşmezse boş bırakılır (bkz. lib/expenseCatalog.js).
    */
+  // Seçili hazır KATEGORİ. Kullanıcının isteği: "harcama tek başlık, alt
+  // sekmeler kategoriler olacak; market alışverişi de benzin de hepsi
+  // harcamanın içinde olmalı." Önceki hâlde 24 hazır seçim tek sırada yan
+  // yanaydı ve market zincirlerinin adları en üstte duruyordu — oysa onlar
+  // yalnızca birer örnekti, başlık değil.
+  const [hizliKat, setHizliKat] = useState('');
+
   const pickQuick = (pr) => {
     if (quick === pr.key) { setQuick(''); setMerchant(''); setCategoryId(''); return; }
     setQuick(pr.key);
@@ -93,6 +100,22 @@ export function ExpenseForm({ onDone, planId, txn, preset, checkoutListId }) {
   const cats = categories.filter((c) => c.kind === (kind === 'income' ? 'income' : 'expense'));
   const parents = cats.filter((c) => !c.parent_id);
   const childrenOf = (pid) => cats.filter((c) => c.parent_id === pid);
+
+  /** Kategoriye dokununca kategori dolar; ikinci dokunuş seçimi kaldırır. */
+  const pickKat = (c) => {
+    if (hizliKat === c.id) { setHizliKat(''); setCategoryId(''); setQuick(''); setMerchant(''); return; }
+    setHizliKat(c.id); setCategoryId(c.id); setQuick(''); setMerchant('');
+  };
+
+  // Seçili kategorinin (ve alt kategorilerinin) hazır yerleri. Market'e
+  // dokunmadan Lider/Jumbo görünmüyor; ekran sade kalıyor.
+  const altIdleri = hizliKat ? childrenOf(hizliKat).map((x) => x.id) : [];
+  const hazirAdlar = hizliKat
+    ? EXPENSE_PRESETS.filter((pr) => {
+        const id = presetCategoryId(pr, categories);
+        return id === hizliKat || altIdleri.includes(id);
+      })
+    : [];
 
   const submit = async (e) => {
     e.preventDefault(); setErr('');
@@ -152,14 +175,25 @@ export function ExpenseForm({ onDone, planId, txn, preset, checkoutListId }) {
         <div style={{ margin: '0 0 var(--sp-4)' }}>
           <div className="faint" style={{ marginBottom: 'var(--sp-2)' }}>{t('money.quickPick')}</div>
           <div className="chips">
-            {EXPENSE_PRESETS.map((pr) => (
-              <button type="button" key={pr.key}
-                className={'chip' + (quick === pr.key ? ' chip--active' : '')}
-                onClick={() => pickQuick(pr)}>
-                {pr.emoji} {presetName(pr, locale)}
+            {parents.map((c) => (
+              <button type="button" key={c.id}
+                className={'chip' + (hizliKat === c.id ? ' chip--active' : '')}
+                onClick={() => pickKat(c)}>
+                {c.icon} {c.name}
               </button>
             ))}
           </div>
+          {hazirAdlar.length > 0 && (
+            <div className="chips" style={{ marginTop: 'var(--sp-2)' }}>
+              {hazirAdlar.map((pr) => (
+                <button type="button" key={pr.key}
+                  className={'chip' + (quick === pr.key ? ' chip--active' : '')}
+                  onClick={() => pickQuick(pr)}>
+                  {pr.emoji} {presetName(pr, locale)}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
       <div className="grid-2">

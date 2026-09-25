@@ -205,14 +205,21 @@ export default function TodayPage() {
 
       </>}
 
-      {/* Para nabzı */}
-      <Card title={`🛒 ${t('today.shopping')}`} action={<span className="faint">{t('today.itemsLeft', openShopping.length)}</span>}>
-        {openShopping.slice(0, 6).map((s) => (
-          <Row key={s.id} icon={<input type="checkbox" checked={false} onChange={async () => { await repo.shopping.toggleItem(s.id); bump(); }} style={{ width: 22, height: 22 }} />} title={s.name} sub={memberById(s.added_by_member_id)?.display_name} />
-        ))}
-        <div className="spacer" />
-        <ShoppingForm />
-      </Card>
+      {/* Alışveriş: LİSTE DEĞİL, BİLDİRİM.
+          Bugün ekranı bir günün özeti olmalı; buraya alışveriş listesini de
+          açmak ekranı iki işin karışımına çeviriyordu. Üstelik listeden kalem
+          çıkarmanın yolu yoktu — deneme amaçlı yazılan bir şey ekranda
+          kalıyordu. Liste artık tek yerde, Aile ekranının alışveriş
+          sekmesinde; burada yalnızca bekleyen olduğunu söyleyen bir satır
+          duruyor ve dokununca oraya gidiyor. */}
+      {openShopping.length > 0 && (
+        <Card className="card--flat">
+          <Row icon="🛒" title={t('today.shopping')}
+            sub={t('today.itemsLeft', openShopping.length)}
+            end={<span className="faint">→</span>}
+            onClick={() => { window.location.href = '/aile/?sekme=shopping'; }} />
+        </Card>
+      )}
     </>
   );
 }

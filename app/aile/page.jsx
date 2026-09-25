@@ -23,7 +23,15 @@ const DOC_ICON = { passport: '🛂', id: '🪪', license: '🚗', visa: '🛃', 
 export default function FamilyPage() {
   const { repo, members, household, memberById, tick, bump, me, categories } = useApp();
   const t = useT();
+  // Bugün ekranındaki alışveriş bildirimi buraya yönlendiriyor; doğrudan
+  // alışveriş sekmesi açılsın, kullanıcı aramasın.
   const [tab, setTab] = useState('members');
+  useEffect(() => {
+    try {
+      const s = new URLSearchParams(window.location.search).get('sekme');
+      if (s) setTab(s);
+    } catch { /* adres okunamazsa varsayılan sekme */ }
+  }, []);
   const [d, setD] = useState(null);
   const [sheet, setSheet] = useState(null);
   const [editing, setEditing] = useState(null);   // düzenlenen üye; null ise yeni kayıt
