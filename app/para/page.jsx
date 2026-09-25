@@ -3,11 +3,12 @@ import { useEffect, useState } from 'react';
 import { useApp } from '../../components/AppShell.jsx';
 import { Card, Row, Money, Bar, Chips, Empty, Sheet, Field } from '../../components/ui.jsx';
 import { ExpenseForm } from '../../components/QuickAdd.jsx';
+import MoneyReport from '../../components/MoneyReport.jsx';
 import { useT } from '../../lib/i18n/context.jsx';
 import { today, periodOf, addMonths, fmtPeriod, fmtDay, relativeLabel } from '../../lib/dates.js';
 import { formatMoney, budgetState, dailyAllowance, parseAmount, minorToDecimal } from '../../lib/money.js';
 
-const TABS = ['overview', 'transactions', 'budgets', 'bills', 'accounts'];
+const TABS = ['overview', 'transactions', 'report', 'budgets', 'bills', 'accounts'];
 
 export default function MoneyPage() {
   const { repo, household, baseCurrency, categoryById, memberById, accountById, categories, members, tick, bump } = useApp();
@@ -19,6 +20,10 @@ export default function MoneyPage() {
   const [editTxn, setEditTxn] = useState(null);      // düzenlenen işlem
   const [fMember, setFMember] = useState('');        // filtre: kim için
   const [fCategory, setFCategory] = useState('');    // filtre: kategori
+  const [fAccount, setFAccount] = useState('');      // filtre: hesap
+  const [fKind, setFKind] = useState('');            // filtre: gelir/gider/transfer
+  const [range, setRange] = useState(6);             // rapor penceresi (ay)
+  const [trend, setTrend] = useState(null);
 
   useEffect(() => {
     if (!household) return;
@@ -30,6 +35,17 @@ export default function MoneyPage() {
       setD({ month, prev, budget, txns, bills, balances });
     })();
   }, [repo, household, period, tick]);
+
+  useEffect(() => {
+    if (!household || tab !== 'report') return;
+    let iptal = false;
+    setTrend(null);
+    (async () => {
+      const r = await repo.summary.trend(period, range);
+      if (!iptal) setTrend(r);
+    })();
+    return () => { iptal = true; };
+  }, [repo, household, period, range, tab, tick]);
 
   if (!d) return <Empty>{t('common.loading')}</Empty>;
   const { month, prev, budget, txns, bills, balances } = d;
@@ -97,7 +113,10 @@ export default function MoneyPage() {
         // Filtre yalnızca görüntüyü daraltır; toplamlar filtreye göre yeniden hesaplanır.
         const shown = txns.filter((x) =>
           (!fMember || x.for_member_id === fMember) &&
-          (!fCategory || x.category_id === fCategory || categoryById(x.category_id)?.parent_id === fCategory));
+          (!fCategory || x.category_id === fCategory || categoryById(x.category_id)?.parent_id === fCategory) &&
+          // Transfer iki hesabı ilgilendirir; hesap filtresinde her ikisinde de görünmeli.
+          (!fAccount || x.account_id === fAccount || x.transfer_account_id === fAccount) &&
+          (!fKind || x.kind === fKind));
         const shownTotal = shown.filter((x) => x.kind === 'expense')
           .reduce((s, x) => s + Number(x.amount_base ?? x.amount), 0);
         return (
@@ -111,8 +130,22 @@ export default function MoneyPage() {
               </Field>
               <Field label={t('money.category')}>
                 <select className="select" value={fCategory} onChange={(e) => setFCategory(e.target.value)}>
-                  <option value="">{t('common.all')}</option>
+                  <option value="">{t('common.any')}</option>
                   {categories.filter((c) => !c.parent_id).map((c) => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+                </select>
+              </Field>
+              <Field label={t('money.account')}>
+                <select className="select" value={fAccount} onChange={(e) => setFAccount(e.target.value)}>
+                  <option value="">{t('common.any')}</option>
+                  {(balances || []).map((a) => <option key={a.account_id} value={a.account_id}>{a.icon} {a.name}</option>)}
+                </select>
+              </Field>
+              <Field label={t('money.kindFilter')}>
+                <select className="select" value={fKind} onChange={(e) => setFKind(e.target.value)}>
+                  <option value="">{t('common.any')}</option>
+                  <option value="expense">{t('money.expense')}</option>
+                  <option value="income">{t('money.income')}</option>
+                  <option value="transfer">{t('money.transfer')}</option>
                 </select>
               </Field>
             </div>
@@ -140,6 +173,10 @@ export default function MoneyPage() {
           </>
         );
       })()}
+
+      {tab === 'report' && (trend
+        ? <MoneyReport trend={trend} baseCurrency={baseCurrency} range={range} onRange={setRange} />
+        : <Empty>{t('common.loading')}</Empty>)}
 
       {tab === 'budgets' && <BudgetsTab t={t} budget={budget} period={period} baseCurrency={baseCurrency} categories={categories} repo={repo} bump={bump} />}
 

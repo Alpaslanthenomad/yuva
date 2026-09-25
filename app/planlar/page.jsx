@@ -31,7 +31,7 @@ export default function PlansPage() {
         <h1 className="h1">{t('plans.title')}</h1>
         <button className="btn btn--sm" onClick={() => setCreating(true)}>+ {t('common.add')}</button>
       </div>
-      <Chips value={filter} onChange={setFilter} options={[{ value: 'all', label: t('common.all') }, ...KINDS.map((k) => ({ value: k, label: `${ICONS[k]} ${t('plans.' + k)}` }))]} />
+      <Chips value={filter} onChange={setFilter} options={[{ value: 'all', label: t('common.any') }, ...KINDS.map((k) => ({ value: k, label: `${ICONS[k]} ${t('plans.' + k)}` }))]} />
       <div className="spacer" />
       {list.map((p) => <PlanCard key={p.id} t={t} plan={p} onOpen={() => setOpenId(p.id)} baseCurrency={baseCurrency} rates={rates} repo={repo} tick={tick} />)}
       {list.length === 0 && <Empty>{t('common.empty')}</Empty>}

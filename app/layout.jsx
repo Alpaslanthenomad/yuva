@@ -19,8 +19,17 @@ export const viewport = {
 
 export default function RootLayout({ children }) {
   // lang, dil seçilince LocaleProvider tarafından istemcide güncellenir.
+  // Bu betik <head> içinde, boyamadan ÖNCE çalışır. Olmasaydı koyu kip seçmiş
+  // biri her açılışta bir anlık beyaz parlama görürdü — telefonda en rahatsız
+  // eden ayrıntı bu. Kısa tutuluyor: burada hata olursa uygulama hiç açılmaz,
+  // o yüzden tamamı try/catch içinde ve başarısız olursa açık kipe düşer.
+  const kipBetigi = `(function(){try{var p=localStorage.getItem('yuva:theme');`
+    + `if(p!=='light'&&p!=='dark'){p=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}`
+    + `var d=document.documentElement;d.dataset.theme=p;d.style.colorScheme=p;}catch(e){}})()`;
+
   return (
-    <html lang="tr">
+    <html lang="tr" suppressHydrationWarning>
+      <head><script dangerouslySetInnerHTML={{ __html: kipBetigi }} /></head>
       <body>
         <LocaleProvider>
           <AppShell>{children}</AppShell>

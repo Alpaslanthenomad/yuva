@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { startOfWeek, weekDays, monthGrid, expandRRule, nextOccurrence, dayInRange, nextOccasionDate, overlaps, addMonths, relativeLabel, buildRRule, freqKeyOf } from '../lib/dates.js';
+import { startOfWeek, weekDays, monthGrid, expandRRule, nextOccurrence, dayInRange, nextOccasionDate, overlaps, addMonths, relativeLabel, buildRRule, freqKeyOf, fmtPeriodShort } from '../lib/dates.js';
 import { easterSunday, holidaysCL, holidaysTR, holidayMap } from '../lib/holidays.js';
 
 test('startOfWeek Pazartesi', () => {
@@ -146,4 +146,14 @@ test('freqKeyOf: FREQ dışındaki parçalar seçimi bozmaz', () => {
   assert.equal(freqKeyOf('FREQ=DAILY'), 'daily');
   assert.equal(freqKeyOf('FREQ=YEARLY'), 'yearly');
   assert.equal(freqKeyOf('BOZUK'), 'none');
+});
+
+test('fmtPeriodShort: grafik ekseni kısa, yıl yalnızca ocakta', () => {
+  // Altı çubuğun altına altı kere yıl yazmak telefonda okunmuyor; ama pencere
+  // yıl atlıyorsa bunun görünmesi gerek — ocak tam o sınır.
+  assert.equal(fmtPeriodShort('2026-09', 'tr'), 'Eyl');
+  assert.equal(fmtPeriodShort('2026-12', 'tr'), 'Ara');
+  assert.equal(fmtPeriodShort('2027-01', 'tr'), 'Oca 27');
+  assert.equal(fmtPeriodShort('2026-09', 'es'), 'sep');
+  assert.equal(fmtPeriodShort('2027-01', 'es'), 'ene 27');
 });

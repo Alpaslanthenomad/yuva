@@ -307,3 +307,34 @@ ul { margin: 0; padding: 0; list-style: none; }
 /* Markette alınmış kalem: ızgarada soluk ve dokunulamaz. Listedeki onay
    kutusundan çıkarılır — buradan yanlışlıkla düşürmek, markette unutmaktır. */
 .picker__item--done { opacity: 0.55; }
+
+/* ---------- Aylık eğilim grafiği (Para › Rapor) ----------
+   Kütüphane yok: statik dışa aktarımda her kütüphane paket boyutu demek ve
+   bir çubuk grafik için gerekmiyor. Çubuklar yükseklikle çiziliyor. */
+.chart { display: flex; align-items: stretch; gap: 4px; height: 140px; padding-top: var(--sp-2); }
+/* Sütun bir <button>: tarayıcı süsünü sıfırla. */
+.chart__col { flex: 1 1 0; min-width: 0; height: 100%; display: flex; flex-direction: column;
+  background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; }
+/* Yükseklik YÜZDEYLE veriliyor; yüzdenin çözülmesi için bu kutunun yüksekliği
+   kesin olmalı. `flex: 1` yeterli değildi — çubuklar 3px'lik izlerine
+   düşüyordu. Etiket satırı 18px, kalanı çubuklara. */
+.chart__bars { height: calc(100% - 18px); display: flex; align-items: flex-end; justify-content: center; gap: 2px; }
+.chart__bars > * { flex: 1 1 0; min-width: 0; }
+.chart__label { height: 18px; line-height: 18px; }
+/* Sıfır olan ay da görünsün: 3px'lik bir iz "veri yok" ile "sıfır" arasındaki
+   farkı gösterir. Tamamen kaybolursa grafik o ayı hiç yaşanmamış gösterir. */
+.chart__bar { min-height: 3px; border-radius: var(--radius-sm) var(--radius-sm) 2px 2px; background: var(--color-expense); opacity: .9; transition: height .3s; }
+.chart__bar--income { background: var(--color-income); }
+.chart__bar--muted { background: var(--color-text-3); opacity: .45; }
+.chart__col--active .chart__bar { opacity: 1; outline: 2px solid var(--color-brand); outline-offset: 1px; }
+.chart__label { font-size: var(--fs-xs); color: var(--color-text-2); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chart__col--active .chart__label { color: var(--color-text); font-weight: 600; }
+.chart-legend { display: flex; gap: var(--sp-3); flex-wrap: wrap; font-size: var(--fs-xs); color: var(--color-text-2); margin-top: var(--sp-2); }
+.chart-legend__dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
+
+/* Kategori satırındaki minik seri — sayı okunmaz, şekil okunur. */
+.spark { display: flex; align-items: flex-end; gap: 2px; height: 18px; margin-top: 6px; }
+.spark__bar { flex: 1 1 0; min-height: 2px; background: var(--color-brand); opacity: .35; border-radius: 2px; }
+.spark__bar--last { opacity: .95; }
+.trend-up { color: var(--color-expense); }
+.trend-down { color: var(--color-income); }

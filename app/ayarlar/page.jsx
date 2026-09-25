@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../../components/AppShell.jsx';
 import { Card, Row, Field, Empty } from '../../components/ui.jsx';
+import ThemeSwitch from '../../components/ThemeSwitch.jsx';
 import { useT, useLocale, LanguageSwitch } from '../../lib/i18n/context.jsx';
 import { LOCALES } from '../../lib/i18n/index.js';
 import { CURRENCIES, CURRENCY_CODES } from '../../lib/money.js';
@@ -33,6 +34,13 @@ export default function SettingsPage() {
       <Card title={`🌐 ${t('settings.language')}`}>
         <LanguageSwitch block />
         <div className="faint" style={{ marginTop: 'var(--sp-3)' }}>{t('settings.languageHint')}</div>
+      </Card>
+
+      {/* Görünüm — dilin hemen altında: ikisi de uygulamanın kullanıcıya nasıl
+          görüneceğiyle ilgili, hane ayarlarıyla değil. */}
+      <Card title={`🎨 ${t('settings.appearance')}`}>
+        <ThemeSwitch />
+        <div className="faint" style={{ marginTop: 'var(--sp-3)' }}>{t('settings.appearanceHint')}</div>
       </Card>
 
       <Card title={t('settings.household')}>

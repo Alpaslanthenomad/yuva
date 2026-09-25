@@ -61,26 +61,63 @@
   --max-w: 720px;
 }
 
+/* ---------------------------------------------------------------------------
+   KOYU KİP — İKİ BLOK, AYNI DEĞERLER
+   ---------------------------------------------------------------------------
+   Uygulama artık cihazın ayarına mahkûm değil: Ayarlar'dan Açık/Koyu/Sistem
+   seçilebiliyor. Seçim `<html data-theme="...">` olarak yazılıyor.
+
+   1) Aşağıdaki MEDYA bloğu yalnızca `data-theme` HENÜZ YOKKEN geçerli — yani
+      açılışta betik çalışana kadarki an. Karanlık kipteki bir telefonda beyaz
+      parlama olmasın diye duruyor.
+   2) İkinci blok açık seçimi uygular.
+
+   İKİ BLOK BİREBİR AYNI DEĞİŞKENLERİ TAŞIMALI. Birine değişken ekleyip
+   diğerine eklemeyi unutmak, "koyu kipte bir renk yanlış" gibi fark edilmesi
+   zor bir hata üretir; `tests/theme.test.js` ikisini karşılaştırıyor.
+   --------------------------------------------------------------------------- */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --color-brand: #5FB79B;
-    --color-brand-soft: #1E332C;
-    --color-brand-ink: #CFEADF;
-    --color-accent: #F0B85C;
-    --color-accent-soft: #3A2E17;
-    --color-danger-soft: #3A1E1A;
-    --color-bg: #121311;
-    --color-surface: #1C1E1B;
-    --color-surface-2: #242723;
-    --color-border: #2F332E;
-    --color-text: #EDEBE4;
-    --color-text-2: #B4B1A8;
-    --color-text-3: #7E7B73;
-    --color-on-brand: #0F1A16;
-    --color-income: #6CCB8F;
-    --color-expense: #F08A78;
-    --color-transfer: #86AEDC;
-    --shadow-1: 0 1px 2px rgba(0,0,0,.4);
-    --shadow-2: 0 6px 20px rgba(0,0,0,.5);
+  :root:not([data-theme]) {
+  --color-brand: #5FB79B;
+  --color-brand-soft: #1E332C;
+  --color-brand-ink: #CFEADF;
+  --color-accent: #F0B85C;
+  --color-accent-soft: #3A2E17;
+  --color-danger-soft: #3A1E1A;
+  --color-bg: #121311;
+  --color-surface: #1C1E1B;
+  --color-surface-2: #242723;
+  --color-border: #2F332E;
+  --color-text: #EDEBE4;
+  --color-text-2: #B4B1A8;
+  --color-text-3: #7E7B73;
+  --color-on-brand: #0F1A16;
+  --color-income: #6CCB8F;
+  --color-expense: #F08A78;
+  --color-transfer: #86AEDC;
+  --shadow-1: 0 1px 2px rgba(0,0,0,.4);
+  --shadow-2: 0 6px 20px rgba(0,0,0,.5);
   }
+}
+
+:root[data-theme="dark"] {
+  --color-brand: #5FB79B;
+  --color-brand-soft: #1E332C;
+  --color-brand-ink: #CFEADF;
+  --color-accent: #F0B85C;
+  --color-accent-soft: #3A2E17;
+  --color-danger-soft: #3A1E1A;
+  --color-bg: #121311;
+  --color-surface: #1C1E1B;
+  --color-surface-2: #242723;
+  --color-border: #2F332E;
+  --color-text: #EDEBE4;
+  --color-text-2: #B4B1A8;
+  --color-text-3: #7E7B73;
+  --color-on-brand: #0F1A16;
+  --color-income: #6CCB8F;
+  --color-expense: #F08A78;
+  --color-transfer: #86AEDC;
+  --shadow-1: 0 1px 2px rgba(0,0,0,.4);
+  --shadow-2: 0 6px 20px rgba(0,0,0,.5);
 }

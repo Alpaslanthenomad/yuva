@@ -7,6 +7,7 @@ import QuickAdd from './QuickAdd.jsx';
 import { useT, useLocale, LanguageSwitch } from '../lib/i18n/context.jsx';
 import { fmtDay, fmtTime } from '../lib/dates.js';
 import { authScreen } from '../lib/authState.js';
+import { readStoredTheme, systemPrefersDark, resolveTheme, applyTheme } from '../lib/theme.js';
 
 const AppCtx = createContext(null);
 export const useApp = () => useContext(AppCtx);
@@ -51,6 +52,24 @@ export default function AppShell({ children }) {
   }, [repo, applyHouseholdDefault]);
 
   useEffect(() => { reload(); }, [reload]);
+
+  // Tercih 'system' iken cihazın kipi değişirse (akşam olunca otomatik koyuya
+  // geçen telefonlar) uygulama da dönsün. Açık/Koyu seçildiyse dokunulmaz —
+  // kullanıcı zaten cihazın dediğini istemediğini söylemiş.
+  useEffect(() => {
+    // <head> betiği rengi zaten uyguladı ama tarayıcı çubuğu etiketine
+    // dokunamıyor: o etiket betikten SONRA head'e ekleniyor. Mount olunca
+    // bir kez daha uygulanıyor, böylece çubuk da doğru renge dönüyor.
+    applyTheme(resolveTheme(readStoredTheme(), systemPrefersDark()));
+
+    let mq;
+    try { mq = window.matchMedia('(prefers-color-scheme: dark)'); } catch { return undefined; }
+    const onChange = () => {
+      if (readStoredTheme() === 'system') applyTheme(resolveTheme('system', systemPrefersDark()));
+    };
+    mq.addEventListener?.('change', onChange);
+    return () => mq.removeEventListener?.('change', onChange);
+  }, []);
 
   /**
    * Kaçırılanları yakala. Canlı yenileme yalnızca kanal AÇIKKEN gelen olayları
