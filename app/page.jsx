@@ -173,32 +173,14 @@ export default function TodayPage() {
       </Card>
       )}
 
-            <Card title={t('today.moneyPulse')} action={<Link className="faint" href="/para/">{t('nav.money')} →</Link>} className="card--brand">
-        <div className="between" style={{ alignItems: 'flex-end' }}>
-          <div>
-            <div className="faint">{t('today.spentThisMonth')}</div>
-            <div style={{ fontSize: 'var(--fs-2xl)', fontWeight: 700 }}>{formatMoney(month.expense, baseCurrency)}</div>
-          </div>
-          {total && (
-            <div style={{ textAlign: 'right' }}>
-              <div className="faint">{t('today.budgetLeft')}</div>
-              <div style={{ fontSize: 'var(--fs-lg)', fontWeight: 700 }}>{formatMoney(total.remaining, baseCurrency)}</div>
-              <div className="faint">{formatMoney(dailyAllowance(total.remaining), baseCurrency)} / {t('today.perDay')}</div>
-            </div>
-          )}
-        </div>
-        {bs && <div style={{ margin: 'var(--sp-3) 0 var(--sp-2)' }}><Bar pct={bs.pct} state={bs.state} /></div>}
-        {month.by_category.length > 0 && (
-          <>
-            <div className="faint" style={{ marginBottom: 'var(--sp-2)' }}>{t('today.top3')}</div>
-            <div className="inline">
-              {month.by_category.slice(0, 3).map((c) => (
-                <span key={c.category_id} className="tag" style={{ background: 'rgba(255,255,255,.18)', color: 'inherit' }}>{c.icon} {c.name} · {formatMoney(c.total, baseCurrency, { compact: true })}</span>
-              ))}
-            </div>
-          </>
-        )}
-      </Card>
+      {/* GÜNÜN RİTMİ + HEDEFLER — paranın yerine.
+          Kullanıcının isteği: "bugün ekranında ne kadar harcadığımızı görmek
+          istemiyorum." Bir günün özet ekranında aylık harcama toplamı zaten
+          rapor parçasıydı; yeri Para ekranı.
+          Yerine gelen şey o anki soruyu cevaplıyor: şu an ne yapıyor olmalıyım,
+          sıradaki ne, ve bugünkü hedeflerim nerede. KİŞİSEL veriden beslenir;
+          eşin kendi kartını görür (0021). */}
+      <RitimKarti />
 
 
       {/* Alışveriş */}
@@ -305,5 +287,66 @@ function TodaySkeleton() {
       <div className="skel skel--title" />
       {[96, 132, 120].map((h, i) => <div key={i} className="skel skel--card" style={{ height: h }} />)}
     </div>
+  );
+}
+
+/**
+ * Bugün ekranındaki tek satırlık kişisel kart.
+ * Blok yoksa ve hedef yoksa HİÇ ÇİZİLMEZ: boş bir kart, kurulmamış bir
+ * özelliği her gün hatırlatan bir sitem olurdu.
+ */
+function RitimKarti() {
+  const { repo, household, tick } = useApp();
+  const t = useT();
+  const [gun, setGun] = useState(null);
+  const [hedefler, setHedefler] = useState([]);
+
+  useEffect(() => {
+    if (!household) return undefined;
+    let iptal = false;
+    (async () => {
+      try {
+        const [d, g] = await Promise.all([repo.personal.day(), repo.personal.goals()]);
+        if (!iptal) { setGun(d); setHedefler(g || []); }
+      } catch { /* kişisel veri okunamazsa Bugün'ün geri kalanı çalışmaya devam etsin */ }
+    })();
+    return () => { iptal = true; };
+  }, [repo, household, tick]);
+
+  const bloklar = gun?.blocks || [];
+  if (bloklar.length === 0 && hedefler.length === 0) return null;
+
+  const d = new Date();
+  const su = d.getHours() * 60 + d.getMinutes();
+  const dk = (x) => { const [h, m] = String(x || '').split(':').map(Number); return (h || 0) * 60 + (m || 0); };
+  const aktif = bloklar.find((b) => dk(b.starts_at) <= su && su < dk(b.ends_at));
+  const siradaki = bloklar.find((b) => dk(b.starts_at) > su);
+  // Günün hedef ortalaması: tek sayı, çünkü Bugün'de yer dar.
+  const ort = hedefler.length
+    ? Math.round(hedefler.reduce((s2, g) => s2 + Number(g.pct || 0), 0) / hedefler.length)
+    : null;
+
+  return (
+    <Card title={t('today.rhythm')} action={<Link className="faint" href="/gunum/">{t('nav.myday')} →</Link>}>
+      {bloklar.length > 0 && (
+        <Row icon={aktif ? (aktif.icon || '⏱️') : '⏱️'}
+          title={aktif ? aktif.title : t('gunum.free')}
+          sub={aktif
+            ? `${String(aktif.starts_at).slice(0, 5)} – ${String(aktif.ends_at).slice(0, 5)}`
+            : undefined}
+          end={siradaki
+            ? <span className="faint">{t('gunum.next')}: {String(siradaki.starts_at).slice(0, 5)}</span>
+            : null} />
+      )}
+      {ort !== null && (
+        <>
+          <div className="between" style={{ marginTop: 'var(--sp-2)' }}>
+            <span className="muted">{t('gunum.goals')}</span>
+            <span className="money">{t('common.pct', ort)}</span>
+          </div>
+          <div style={{ marginTop: 6 }}><Bar pct={ort} /></div>
+        </>
+      )}
+    </Card>
   );
 }

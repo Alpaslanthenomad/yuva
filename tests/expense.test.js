@@ -98,8 +98,8 @@ test('market seçimleri ÜST kategori "Market"e düşer, "Gıda" altına değil'
 });
 
 test('spor ve eczane doğru yere düşer', () => {
-  assert.equal(presetCategoryId(by('sport'), GERCEK), 'e');
-  assert.equal(presetCategoryId(by('pharmacy'), GERCEK), 's3');
+  assert.equal(presetCategoryId(by('sport'), GERCEK), 'e');    // Eğlence & Sosyal
+  assert.equal(presetCategoryId(by('pharmacy'), GERCEK), 's3'); // Eczane (alt kategori)
 });
 
 test('HİÇBİR SEÇİM BOŞTA KALMIYOR — hanenin gerçek kategorileriyle', () => {

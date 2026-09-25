@@ -7,6 +7,7 @@ import Icon from './icons.jsx';
 const ITEMS = [
   { href: '/', key: 'today' },
   { href: '/takvim/', key: 'calendar' },
+  { href: '/gunum/', key: 'myday' },
   { href: '/para/', key: 'money' },
   { href: '/planlar/', key: 'plans' },
   { href: '/aile/', key: 'family' },

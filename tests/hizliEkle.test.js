@@ -13,6 +13,7 @@ const quick = readFileSync(new URL('../components/QuickAdd.jsx', import.meta.url
 test('"+" > Alışveriş EMOJİ IZGARASINI açar, yazı kutusunu değil', () => {
   assert.match(quick, /import ShoppingPicker from '\.\/ShoppingPicker\.jsx'/);
   assert.match(quick, /tab === 'shopping' && <ShoppingQuickPick/);
+  // Izgara yazı kutusundan ÖNCE çiziliyor.
   const i = quick.indexOf('export function ShoppingQuickPick');
   assert.notEqual(i, -1);
   const govde = quick.slice(i);
@@ -26,6 +27,8 @@ test('yazı kutusu SİLİNMEDİ — katalogda olmayan şey yazılabilmeli', () =
 });
 
 test('KLAVYE KENDİLİĞİNDEN AÇILMIYOR — ızgarayı örterdi', () => {
+  // autoFocus artık isteğe bağlı ve varsayılan kapalı; hiçbir yerden
+  // açık geçilmiyor.
   assert.match(quick, /ShoppingForm\(\{ onDone, listId, autoFocus = false \}\)/);
   assert.match(quick, /autoFocus=\{autoFocus\}/);
   assert.ok(!/<ShoppingForm[^>]*autoFocus(?!=\{autoFocus\})/.test(quick));
