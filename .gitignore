@@ -5,3 +5,6 @@ out/
 .env.local
 .DS_Store
 *.log
+
+# Derleme sirasinda uretilir (scripts/yayin-surumu.mjs)
+public/version.json

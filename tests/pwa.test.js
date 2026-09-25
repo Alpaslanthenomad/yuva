@@ -92,7 +92,12 @@ test('YAYIN KOMUTU SABİTLENMİŞ — postbuild atlanmasın', () => {
   const v = JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'));
   assert.equal(v.buildCommand, 'npm run build');
   const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
-  assert.match(pkg.scripts.postbuild, /yayin-surumu/);
+  assert.match(pkg.scripts.prebuild, /yayin-surumu/);
+  // ÖNCE, sonra değil: Vercel out/ klasörüne sonradan eklenen dosyaları
+  // almıyor. Dosya public/ içine, derlemeden önce yazılmalı.
+  assert.equal(pkg.scripts.postbuild, undefined);
+  const script = readFileSync(new URL('../scripts/yayin-surumu.mjs', import.meta.url), 'utf8');
+  assert.match(script, /public\/version\.json/);
 });
 
 test('sürüm bilgisi derlemeye gömülüyor ve ekranda gösteriliyor', () => {

@@ -9,7 +9,7 @@
     "serve": "npx serve out -l 3000",
     "test": "node --test tests/*.test.js",
     "lint": "next lint",
-    "postbuild": "node scripts/yayin-surumu.mjs"
+    "prebuild": "node scripts/yayin-surumu.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",
