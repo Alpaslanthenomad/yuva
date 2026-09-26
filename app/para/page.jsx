@@ -1,14 +1,16 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useApp } from '../../components/AppShell.jsx';
-import { Card, Row, Money, Bar, Chips, Empty, Sheet, Field } from '../../components/ui.jsx';
+import { Card, Row, Money, Bar, Chips, Seg, Empty, Sheet, Field } from '../../components/ui.jsx';
 import { ExpenseForm } from '../../components/QuickAdd.jsx';
 import MoneyReport from '../../components/MoneyReport.jsx';
 import { useT } from '../../lib/i18n/context.jsx';
 import { today, periodOf, addMonths, fmtPeriod, fmtDay, relativeLabel } from '../../lib/dates.js';
 import { formatMoney, budgetState, dailyAllowance, parseAmount, minorToDecimal } from '../../lib/money.js';
 
-const TABS = ['overview', 'transactions', 'report', 'budgets', 'bills', 'accounts'];
+// Altı sekme telefonda tek satıra sığmıyordu ("Dü…" kesiliyordu). Düzenli
+// ödemeler Hesaplar sekmesinin altına taşındı; beş sekme eşit genişlikte.
+const TABS = ['overview', 'transactions', 'report', 'budgets', 'accounts'];
 
 export default function MoneyPage() {
   const { repo, household, baseCurrency, categoryById, memberById, accountById, categories, members, tick, bump } = useApp();
@@ -18,7 +20,9 @@ export default function MoneyPage() {
   const [d, setD] = useState(null);
   const [adding, setAdding] = useState(false);
   const [editTxn, setEditTxn] = useState(null);      // düzenlenen işlem
-  const [fMember, setFMember] = useState('');        // filtre: kim için
+  const [fScope, setFScope] = useState('');          // filtre: aile / kişisel
+  const [scope, setScope] = useState('family');      // rapor kapsamı (0027)
+  const [limitAcik, setLimitAcik] = useState(false); // kişisel limit formu
   const [fCategory, setFCategory] = useState('');    // filtre: kategori
   const [fAccount, setFAccount] = useState('');      // filtre: hesap
   const [fKind, setFKind] = useState('');            // filtre: gelir/gider/transfer
@@ -41,51 +45,69 @@ export default function MoneyPage() {
     let iptal = false;
     setTrend(null);
     (async () => {
-      const r = await repo.summary.trend(period, range);
+      const r = await repo.summary.trend(period, range, scope);
       if (!iptal) setTrend(r);
     })();
     return () => { iptal = true; };
-  }, [repo, household, period, range, tab, tick]);
+  }, [repo, household, period, range, scope, tab, tick]);
 
   if (!d) return <Empty>{t('common.loading')}</Empty>;
   const { month, prev, budget, txns, bills, balances } = d;
-  const net = month.income - month.expense;
-  const savings = month.income > 0 ? Math.round((net / month.income) * 100) : 0;
+  // Net, nakit akışının sorusu: gelirden AİLE + KİŞİSEL bütün giderler düşer.
+  const net = month.income - (month.total_expense ?? month.expense);
   const delta = prev.expense > 0 ? Math.round(((month.expense - prev.expense) / prev.expense) * 100) : null;
   const total = budget.find((b) => b.category_id === null);
   const catTotal = month.by_category.reduce((s, c) => s + c.total, 0) || 1;
+  const kisisel = month.personal || { total: 0, limit: null, by_category: [] };
+  const buAy = period === periodOf(today());
 
   return (
     <>
+      {/* Başlıkta ayrı "Harcama ekle" düğmesi yok: sağ alttaki + zaten aynı
+          işi yapıyor. İki düğme, tek iş için iki yer demekti. */}
       <div className="page-head">
-        <div>
-          <h1 className="h1">{t('money.title')}</h1>
-          <div className="page-head__sub inline">
-            <button className="btn btn--ghost btn--sm" onClick={() => setPeriod(periodOf(addMonths(period + '-01', -1)))}>‹</button>
-            <span>{fmtPeriod(period)}</span>
-            <button className="btn btn--ghost btn--sm" onClick={() => setPeriod(periodOf(addMonths(period + '-01', 1)))}>›</button>
-          </div>
-        </div>
-        <button className="btn btn--sm" onClick={() => setAdding(true)}>+ {t('money.addTxn')}</button>
+        <h1 className="h1">{t('money.title')}</h1>
       </div>
-      <Chips value={tab} onChange={setTab} options={TABS.map((k) => ({ value: k, label: t('money.' + k) }))} />
+      <div className="cal-nav">
+        <button type="button" className="btn btn--ghost btn--sm" onClick={() => setPeriod(periodOf(addMonths(period + '-01', -1)))} aria-label="‹">‹</button>
+        <button type="button" className="cal-nav__label" onClick={() => setPeriod(periodOf(today()))}>{fmtPeriod(period)}</button>
+        <button type="button" className="btn btn--ghost btn--sm" onClick={() => setPeriod(periodOf(addMonths(period + '-01', 1)))} aria-label="›">›</button>
+      </div>
+      <div className="seg-fit"><Seg value={tab} onChange={setTab} options={TABS.map((k) => ({ value: k, label: t('money.' + k) }))} /></div>
       <div className="spacer" />
 
+      {/* ÖZET — üç soru, üç kart:
+          1) Aile bu ay ne harcadı, limitin neresindeyiz?
+          2) Aile parası nereye gitti? (kategori)
+          3) Benim kişisel harcamam ve limitim.
+          Üye dağılımı ve sabit/değişken kutuları kaldırıldı: harcamalar aile
+          için yapılıyor; kişi ayrımını artık kişisel işareti taşıyor. */}
       {tab === 'overview' && (
         <>
-          <div className="stats" style={{ marginBottom: 'var(--sp-3)' }}>
-            <div className="stat"><div className="stat__label">{t('money.income')}</div><div className="stat__value money--income">{formatMoney(month.income, baseCurrency, { compact: true })}</div></div>
-            <div className="stat"><div className="stat__label">{t('money.expense')}</div><div className="stat__value money--expense">{formatMoney(month.expense, baseCurrency, { compact: true })}</div>{delta !== null && <div className="faint">{delta > 0 ? '▲' : '▼'} {t('common.pct', Math.abs(delta))} {t('money.vsLastMonth')}</div>}</div>
-            <div className="stat"><div className="stat__label">{t('money.net')}</div><div className="stat__value">{formatMoney(net, baseCurrency, { compact: true })}</div><div className="faint">{t('money.savingsRate')} {t('common.pct', savings)}</div></div>
-          </div>
-
-          {total ? (
-            <Card title={t('money.monthBudget')}>
-              <div className="between"><span className="muted">{formatMoney(total.spent, baseCurrency)} / {formatMoney(total.budget, baseCurrency)}</span><span className="money">{formatMoney(total.remaining, baseCurrency)} {t('money.left')}</span></div>
-              <div style={{ margin: 'var(--sp-2) 0' }}><Bar pct={total.pct} state={budgetState(total.spent, total.budget).state} /></div>
-              <div className="faint">{formatMoney(dailyAllowance(total.remaining), baseCurrency)} / {t('today.perDay')}</div>
-            </Card>
-          ) : <div className="banner">{t('money.noBudget')}</div>}
+          <Card className="butce-ozet">
+            <div className="butce-ozet__etiket">{t('money.familySpend')}</div>
+            <div className="butce-ozet__tutar">{formatMoney(month.expense, baseCurrency)}</div>
+            {delta !== null && (
+              <div className="faint">{delta > 0 ? '▲' : '▼'} {t('common.pct', Math.abs(delta))} {t('money.vsLastMonth')}</div>
+            )}
+            {total ? (
+              <>
+                <div style={{ margin: 'var(--sp-3) 0 var(--sp-1)' }}><Bar pct={total.pct} state={budgetState(total.spent, total.budget).state} /></div>
+                <div className="between faint">
+                  <span>{t('money.familyLimit')}: {formatMoney(total.budget, baseCurrency)}</span>
+                  <span>{total.remaining >= 0 ? `${formatMoney(total.remaining, baseCurrency)} ${t('money.left')}` : `${formatMoney(-total.remaining, baseCurrency)} ${t('money.over')}`}</span>
+                </div>
+                {buAy && total.remaining > 0 && <div className="faint" style={{ marginTop: 2 }}>{t('money.leftPerDay', formatMoney(dailyAllowance(total.remaining), baseCurrency))}</div>}
+              </>
+            ) : (
+              <button type="button" className="btn btn--ghost btn--sm" style={{ marginTop: 'var(--sp-2)', paddingLeft: 0 }} onClick={() => setTab('budgets')}>+ {t('money.setLimit')}</button>
+            )}
+            {month.income > 0 && (
+              <div className="faint" style={{ marginTop: 'var(--sp-2)' }}>
+                {t('money.incomeLine', formatMoney(month.income, baseCurrency, { compact: true }), formatMoney(net, baseCurrency, { compact: true }))}
+              </div>
+            )}
+          </Card>
 
           <Card title={t('money.byCategory')}>
             {month.by_category.map((c) => (
@@ -96,23 +118,15 @@ export default function MoneyPage() {
             {month.by_category.length === 0 && <Empty>{t('common.empty')}</Empty>}
           </Card>
 
-          <div className="grid-2">
-            <Card title={t('money.byMember')}>
-              {month.by_member.map((m) => <Row key={m.member_id} title={m.name} end={<span className="money">{formatMoney(m.total, baseCurrency, { compact: true })}</span>} />)}
-              {month.by_member.length === 0 && <Empty>{t('common.empty')}</Empty>}
-            </Card>
-            <Card title={`${t('money.fixed')} / ${t('money.variable')}`}>
-              <Row title={t('money.fixed')} end={<span className="money">{formatMoney(month.fixed || 0, baseCurrency, { compact: true })}</span>} />
-              <Row title={t('money.variable')} end={<span className="money">{formatMoney(month.variable ?? month.expense, baseCurrency, { compact: true })}</span>} />
-            </Card>
-          </div>
+          <KisiselKart t={t} kisisel={kisisel} baseCurrency={baseCurrency} repo={repo} bump={bump}
+            acik={limitAcik} setAcik={setLimitAcik} />
         </>
       )}
 
       {tab === 'transactions' && (() => {
         // Filtre yalnızca görüntüyü daraltır; toplamlar filtreye göre yeniden hesaplanır.
         const shown = txns.filter((x) =>
-          (!fMember || x.for_member_id === fMember) &&
+          (!fScope || (fScope === 'personal' ? Boolean(x.for_member_id) : !x.for_member_id || x.kind !== 'expense')) &&
           (!fCategory || x.category_id === fCategory || categoryById(x.category_id)?.parent_id === fCategory) &&
           // Transfer iki hesabı ilgilendirir; hesap filtresinde her ikisinde de görünmeli.
           (!fAccount || x.account_id === fAccount || x.transfer_account_id === fAccount) &&
@@ -121,13 +135,12 @@ export default function MoneyPage() {
           .reduce((s, x) => s + Number(x.amount_base ?? x.amount), 0);
         return (
           <>
+            <Chips value={fScope} onChange={setFScope} options={[
+              { value: '', label: t('money.scopeAll') },
+              { value: 'family', label: '👨‍👩‍👧 ' + t('money.family') },
+              { value: 'personal', label: '👤 ' + t('money.personal') }]} />
+            <div className="spacer" />
             <div className="grid-2" style={{ marginBottom: 'var(--sp-3)' }}>
-              <Field label={t('money.forWhom')}>
-                <select className="select" value={fMember} onChange={(e) => setFMember(e.target.value)}>
-                  <option value="">{t('common.all')}</option>
-                  {members.map((m) => <option key={m.id} value={m.id}>{m.avatar_emoji} {m.display_name}</option>)}
-                </select>
-              </Field>
               <Field label={t('money.category')}>
                 <select className="select" value={fCategory} onChange={(e) => setFCategory(e.target.value)}>
                   <option value="">{t('common.any')}</option>
@@ -157,7 +170,7 @@ export default function MoneyPage() {
                 const c = categoryById(x.category_id);
                 return (
                   <Row key={x.id} icon={x.kind === 'transfer' ? '🔁' : c?.icon || '🏷️'} title={x.merchant || c?.name || t('money.' + x.kind)}
-                    sub={`${fmtDay(x.occurred_on)} · ${accountById(x.account_id)?.name || ''}${x.for_member_id ? ' · ' + memberById(x.for_member_id)?.display_name : ''}${x.plan_id ? ' · 🧭' : ''}`}
+                    sub={`${fmtDay(x.occurred_on)} · ${accountById(x.account_id)?.name || ''}${x.for_member_id ? ` · 👤 ${memberById(x.for_member_id)?.display_name || t('money.personal')}` : ''}${x.plan_id ? ' · 🧭' : ''}`}
                     end={<div><Money amount={x.amount} currency={x.currency} kind={x.kind} />{x.currency !== baseCurrency && <div className="faint">≈ {formatMoney(x.amount_base, baseCurrency)}</div>}</div>}
                     onClick={() => setEditTxn(x)} />
                 );
@@ -177,21 +190,27 @@ export default function MoneyPage() {
         );
       })()}
 
-      {tab === 'report' && (trend
-        ? <MoneyReport trend={trend} baseCurrency={baseCurrency} range={range} onRange={setRange} />
-        : <Empty>{t('common.loading')}</Empty>)}
-
-      {tab === 'budgets' && <BudgetsTab t={t} budget={budget} period={period} baseCurrency={baseCurrency} categories={categories} repo={repo} bump={bump} />}
-
-      {tab === 'bills' && (
-        <Card>
-          {bills.map((b) => (
-            <Row key={b.id} icon={categoryById(b.category_id)?.icon || '🧾'} title={b.name} sub={`${t('money.nextDue')}: ${fmtDay(b.next_due_on)} · ${relativeLabel(b.next_due_on)}${b.auto_post ? ' · ⚙︎ ' + t('money.autoPost') : ''}`} end={<Money amount={b.amount} currency={b.currency} kind={b.kind} />} />
-          ))}
-          {bills.length === 0 && <Empty>{t('common.empty')}</Empty>}
+      {tab === 'report' && (
+        <>
+          {/* Rapor iki ayrı hikâye anlatıyor: ailenin parası ve benim kişisel
+              harcamam. Karıştırılırsa kişisel harcama aile ortalamasını şişirir. */}
+          <Chips value={scope} onChange={setScope} options={[
+            { value: 'family', label: '👨‍👩‍👧 ' + t('money.family') },
+            { value: 'personal', label: '👤 ' + t('money.personal') }]} />
           <div className="spacer" />
-          <div className="between muted"><span>{t('money.monthlyFixed')}</span><span className="money">{formatMoney(bills.filter((b) => b.kind === 'expense' && b.currency === baseCurrency).reduce((s, b) => s + Number(b.amount), 0), baseCurrency)} +</span></div>
-        </Card>
+          {trend
+            ? <MoneyReport trend={trend} baseCurrency={baseCurrency} range={range} onRange={setRange} />
+            : <Empty>{t('common.loading')}</Empty>}
+        </>
+      )}
+
+      {tab === 'budgets' && (
+        <>
+          <div className="section-title">👨‍👩‍👧 {t('money.familyLimit')}</div>
+          <BudgetsTab t={t} budget={budget} period={period} baseCurrency={baseCurrency} categories={categories} repo={repo} bump={bump} />
+          <KisiselKart t={t} kisisel={kisisel} baseCurrency={baseCurrency} repo={repo} bump={bump}
+            acik={limitAcik} setAcik={setLimitAcik} />
+        </>
       )}
 
       {tab === 'accounts' && (
@@ -201,6 +220,17 @@ export default function MoneyPage() {
           ))}
           <div className="spacer" />
           <div className="between"><span className="muted">{t('money.totalIn', baseCurrency)}</span><span className="money">{formatMoney(balances.reduce((s, a) => s + (a.balance_base ?? (a.currency === baseCurrency ? a.balance : 0)), 0), baseCurrency)}</span></div>
+        </Card>
+      )}
+
+      {tab === 'accounts' && (
+        <Card title={t('money.upcomingBills')}>
+          {bills.map((b) => (
+            <Row key={b.id} icon={categoryById(b.category_id)?.icon || '🧾'} title={b.name} sub={`${t('money.nextDue')}: ${fmtDay(b.next_due_on)} · ${relativeLabel(b.next_due_on)}${b.auto_post ? ' · ⚙︎ ' + t('money.autoPost') : ''}`} end={<Money amount={b.amount} currency={b.currency} kind={b.kind} />} />
+          ))}
+          {bills.length === 0 && <Empty>{t('common.empty')}</Empty>}
+          <div className="spacer" />
+          <div className="between muted"><span>{t('money.monthlyFixed')}</span><span className="money">{formatMoney(bills.filter((b) => b.kind === 'expense' && b.currency === baseCurrency).reduce((s, b) => s + Number(b.amount), 0), baseCurrency)} +</span></div>
         </Card>
       )}
 
@@ -295,5 +325,64 @@ function BudgetsTab({ t, budget, period, baseCurrency, categories, repo, bump })
         )}
       </Card>
     </>
+  );
+}
+
+/**
+ * Kişisel harcamam (0027). Yalnızca BENİM kişisel toplamım ve limitim;
+ * eşin kendi ekranında kendininkini görür. Limit aylık ve kalıcı — her ay
+ * yeniden girilmiyor. Aile bütçesinden bağımsız.
+ */
+function KisiselKart({ t, kisisel, baseCurrency, repo, bump, acik, setAcik }) {
+  const [tutar, setTutar] = useState('');
+  const [busy, setBusy] = useState(false);
+  const limit = Number(kisisel.limit || 0);
+  const st = limit > 0 ? budgetState(kisisel.total, limit) : null;
+
+  const kaydet = async (e) => {
+    e.preventDefault();
+    const minor = parseAmount(tutar, baseCurrency);
+    if (!minor) return;
+    setBusy(true);
+    try { await repo.budgets.setPersonalLimit(minorToDecimal(minor, baseCurrency)); setTutar(''); setAcik(false); bump(); }
+    finally { setBusy(false); }
+  };
+  const kaldir = async () => {
+    setBusy(true);
+    try { await repo.budgets.setPersonalLimit(0); setAcik(false); bump(); } finally { setBusy(false); }
+  };
+
+  return (
+    <Card title={`👤 ${t('money.personalSpend')}`}
+      action={<span className="money">{formatMoney(kisisel.total, baseCurrency)}</span>}>
+      {limit > 0 && (
+        <>
+          <Bar pct={st.pct} state={st.state} />
+          <div className="between faint" style={{ marginTop: 4 }}>
+            <span>{t('money.personalLimit')}: {formatMoney(limit, baseCurrency)}</span>
+            <span>{limit - kisisel.total >= 0
+              ? `${formatMoney(limit - kisisel.total, baseCurrency)} ${t('money.left')}`
+              : `${formatMoney(kisisel.total - limit, baseCurrency)} ${t('money.over')}`}</span>
+          </div>
+        </>
+      )}
+      {kisisel.by_category.slice(0, 3).map((c) => (
+        <Row key={c.category_id} icon={c.icon} title={c.name} end={<Money amount={c.total} currency={baseCurrency} />} />
+      ))}
+      {kisisel.total === 0 && <div className="faint" style={{ margin: 'var(--sp-2) 0' }}>{t('money.noPersonal')}</div>}
+
+      {acik ? (
+        <form onSubmit={kaydet} className="inline" style={{ flexWrap: 'nowrap', marginTop: 'var(--sp-3)' }}>
+          <input className="input" inputMode="decimal" autoFocus placeholder={limit ? String(limit) : '0'}
+            value={tutar} onChange={(e) => setTutar(e.target.value)} aria-label={t('money.personalLimit')} />
+          <button className="btn" disabled={busy}>{t('common.save')}</button>
+          {limit > 0 && <button type="button" className="btn btn--ghost" disabled={busy} onClick={kaldir}>{t('money.removeLimit')}</button>}
+        </form>
+      ) : (
+        <button type="button" className="btn btn--ghost btn--sm" style={{ marginTop: 'var(--sp-2)', paddingLeft: 0 }}
+          onClick={() => setAcik(true)}>{limit ? t('money.changeLimit') : '+ ' + t('money.setLimit')}</button>
+      )}
+      <div className="faint" style={{ marginTop: 'var(--sp-2)' }}>{t('money.personalNote')}</div>
+    </Card>
   );
 }

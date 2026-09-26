@@ -192,7 +192,7 @@ export function ExpenseForm({ onDone, planId, txn, preset, checkoutListId }) {
         kind, amount: minorToDecimal(minor, currency), currency, account_id: accountId,
         transfer_account_id: kind === 'transfer' ? toAccountId : null,
         category_id: kind === 'transfer' ? null : categoryId || null, merchant: merchant || null,
-        for_member_id: forMember || null, occurred_on: date,
+        for_member_id: kind === 'expense' ? (forMember || null) : null, occurred_on: date,
       };
       if (editing) {
         await repo.transactions.update(txn.id, row);
@@ -255,6 +255,17 @@ export function ExpenseForm({ onDone, planId, txn, preset, checkoutListId }) {
           <button type="button" key={c} className={'chip' + (currency === c ? ' chip--active' : '')} onClick={() => setCurrency(c)} title={t('currencies.' + c)}>{CURRENCIES[c].flag} {c}</button>
         ))}
       </div>
+      {/* AİLE / KİŞİSEL (0027). Varsayılan aile — belirtmeye gerek yok.
+          Kişisel harcama tek dokunuşla işaretleniyor ve aile bütçesinden
+          ayrı, sahibinin kendi limitinde sayılıyor. */}
+      {kind === 'expense' && (
+        <div className="seg" style={{ display: 'flex', marginBottom: 'var(--sp-4)' }} role="group" aria-label={t('money.scope')}>
+          <button type="button" className={'seg__btn' + (!forMember ? ' seg__btn--active' : '')} style={{ flex: 1 }}
+            aria-pressed={!forMember} onClick={() => setForMember('')}>👨‍👩‍👧 {t('money.family')}</button>
+          <button type="button" className={'seg__btn' + (forMember ? ' seg__btn--active' : '')} style={{ flex: 1 }}
+            aria-pressed={Boolean(forMember)} onClick={() => setForMember(forMember || me?.id || '')}>👤 {t('money.personal')}</button>
+        </div>
+      )}
       {/* Hazır harcamalar. Tutarı yazdıktan sonra tek dokunuş: "nereye" ve
           kategori birlikte dolar. Yalnızca giderde anlamlı. */}
       {kind === 'expense' && (
@@ -315,17 +326,9 @@ export function ExpenseForm({ onDone, planId, txn, preset, checkoutListId }) {
       <Field label={t('money.merchant')}>
         <input className="input" value={merchant} onChange={(e) => setMerchant(e.target.value)} placeholder={t('money.merchantHint')} />
       </Field>
-      <div className="grid-2">
-        <Field label={t('money.forWhom')}>
-          <select className="select" value={forMember} onChange={(e) => setForMember(e.target.value)}>
-            <option value="">{t('common.shared')}</option>
-            {members.map((m) => <option key={m.id} value={m.id}>{m.avatar_emoji} {m.display_name}</option>)}
-          </select>
-        </Field>
-        <Field label={t('money.date')}>
-          <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-        </Field>
-      </div>
+      <Field label={t('money.date')}>
+        <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+      </Field>
       {err && <div className="banner" style={{ color: 'var(--color-danger)' }}>{err}</div>}
       <button className="btn btn--block" disabled={busy}>{t('common.save')}</button>
       {editing && (

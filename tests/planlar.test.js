@@ -39,3 +39,55 @@ test('bölümler: yaklaşan, fikir, hedef, geçmiş', () => {
   assert.equal(planSection({ kind: 'gathering', status: 'planned', starts_on: '2026-09-01' }, T), 'past');
   assert.equal(planSection({ kind: 'gathering', status: 'cancelled', starts_on: '2026-10-01' }, T), 'past');
 });
+
+// ---- Plan masrafları (0028) — demo deposu SQL tetiklerinin aynası ----------
+import makeDemoRepo from '../lib/data/demoRepo.js';
+
+async function yeniPlan() {
+  const repo = makeDemoRepo(); repo.reset('tr');
+  const plan = await repo.plans.create({ title: 'Padel', kind: 'gathering', category: 'sport', has_money: false });
+  const harcamalar = async () => (await repo.transactions.list({ planId: plan.id }));
+  return { repo, plan, harcamalar };
+}
+
+test('masraf: ödendi eklenince Bütçe’ye harcama düşer (aile harcaması, plana bağlı)', async () => {
+  const { repo, plan, harcamalar } = await yeniPlan();
+  await repo.plans.addItem({ plan_id: plan.id, kind: 'checklist', title: 'Kort ücreti', amount: 10000, currency: 'CLP', is_done: true });
+  const h = await harcamalar();
+  assert.equal(h.length, 1);
+  assert.equal(h[0].amount, 10000);
+  assert.equal(h[0].for_member_id, null);
+  assert.equal(h[0].merchant, 'Kort ücreti');
+});
+
+test('masraf: ödenmemiş bekler; işaretlenince düşer, işaret kalkınca kalkar', async () => {
+  const { repo, plan, harcamalar } = await yeniPlan();
+  const k = await repo.plans.addItem({ plan_id: plan.id, kind: 'checklist', title: 'Pasta', amount: 15000, currency: 'CLP', is_done: false });
+  assert.equal((await harcamalar()).length, 0);
+  await repo.plans.updateItem(k.id, { is_done: true });
+  assert.equal((await harcamalar()).length, 1);
+  await repo.plans.updateItem(k.id, { amount: 18000 });
+  assert.equal((await harcamalar())[0].amount, 18000);
+  await repo.plans.updateItem(k.id, { is_done: false });
+  assert.equal((await harcamalar()).length, 0);
+});
+
+test('masraf: kalem silinince harcaması da silinir; harcama silinince kalem ödenmediye döner', async () => {
+  const { repo, plan, harcamalar } = await yeniPlan();
+  const a = await repo.plans.addItem({ plan_id: plan.id, kind: 'checklist', title: 'A', amount: 1000, currency: 'CLP', is_done: true });
+  const b = await repo.plans.addItem({ plan_id: plan.id, kind: 'checklist', title: 'B', amount: 2000, currency: 'CLP', is_done: true });
+  await repo.plans.removeItem(a.id);
+  assert.deepEqual((await harcamalar()).map((x) => x.merchant), ['B']);
+  await repo.transactions.remove((await harcamalar())[0].id);
+  const kalem = (await repo.plans.items(plan.id)).find((i) => i.id === b.id);
+  assert.equal(kalem.is_done, false);
+});
+
+test('plan silinebiliyor; ödenmiş masraflar Bütçe’de kalır', async () => {
+  const { repo, plan } = await yeniPlan();
+  await repo.plans.addItem({ plan_id: plan.id, kind: 'checklist', title: 'Kort', amount: 10000, currency: 'CLP', is_done: true });
+  await repo.plans.remove(plan.id);
+  assert.equal((await repo.plans.list()).some((p) => p.id === plan.id), false);
+  const hepsi = await repo.transactions.list({});
+  assert.equal(hepsi.some((t) => t.merchant === 'Kort' && t.amount === 10000), true);
+});

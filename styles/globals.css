@@ -457,3 +457,12 @@ ul { margin: 0; padding: 0; list-style: none; }
 .bildirim-satir { display: flex; align-items: center; gap: var(--sp-2); min-height: var(--tap);
   border-bottom: 1px solid var(--color-border); padding: var(--sp-1) 0; }
 .bildirim-satir:last-of-type { border-bottom: 0; }
+
+/* Bütçe özeti: tek büyük sayı, altında limit çubuğu. */
+.butce-ozet__etiket { font-size: var(--fs-sm); font-weight: 600; color: var(--color-text-2); }
+.butce-ozet__tutar { font-size: var(--fs-3xl); font-weight: 800; line-height: 1.15; margin: 2px 0 4px;
+  font-variant-numeric: tabular-nums; }
+/* Beş sekme 358 px'e sığsın: eşit genişlik, küçük yazı, taşma yok. */
+.seg-fit .seg { display: flex; width: 100%; overflow: hidden; }
+.seg-fit .seg__btn { flex: 1 1 0; min-width: 0; padding-left: 2px; padding-right: 2px;
+  font-size: var(--fs-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

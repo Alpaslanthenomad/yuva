@@ -4,7 +4,8 @@ import { useApp } from '../../components/AppShell.jsx';
 import { Card, Row, Bar, Chips, Empty, Sheet, Field } from '../../components/ui.jsx';
 import { ExpenseForm, TaskForm } from '../../components/QuickAdd.jsx';
 import { useT, useLocale } from '../../lib/i18n/context.jsx';
-import { PLAN_GROUPS, PLAN_CATEGORIES, planCategory, categoryName, categoryHint, categoryList, groupName, planSection } from '../../lib/planCatalog.js';
+import { PLAN_GROUPS, PLAN_CATEGORIES, PLAN_COST_CATEGORY, planCategory, categoryName, categoryHint, categoryList, groupName, planSection } from '../../lib/planCatalog.js';
+import { presetCategoryId } from '../../lib/expenseCatalog.js';
 import { today, daysBetween, fmtDay, fmtDayLong } from '../../lib/dates.js';
 import { formatMoney, budgetState, parseAmount, minorToDecimal, planTotals, CURRENCY_CODES } from '../../lib/money.js';
 
@@ -126,9 +127,9 @@ function usePlanNumbers(plan, repo, tick, baseCurrency, rates) {
   useEffect(() => {
     let iptal = false;
     (async () => {
-      // Parası olmayan planda harcama sorgusu boşuna; yalnızca liste gerekiyor.
+      // Bütçesi olmayan planın da masrafı olabilir (0028); harcamalar hep okunur.
       const [txns, items, contrib] = await Promise.all([
-        plan.has_money === false ? Promise.resolve([]) : repo.transactions.list({ planId: plan.id }),
+        repo.transactions.list({ planId: plan.id }),
         repo.plans.items(plan.id),
         plan.kind === 'goal' && repo.plans.contributions ? repo.plans.contributions(plan.id) : Promise.resolve([]),
       ]);
@@ -149,7 +150,8 @@ function PlanCard({ t, locale, plan, T, onOpen, baseCurrency, rates, repo, tick 
   const target = isGoal ? Number(plan.target_amount) : Number(plan.budget_amount || 0);
   const progress = isGoal ? contrib : actual;
   const st = budgetState(progress, target);
-  const checks = items.filter((i) => i.kind === 'checklist');
+  // Masraflar (tutarlı kalemler) kontrol listesi sayılmaz; ayrı gösteriliyor.
+  const checks = items.filter((i) => i.kind === 'checklist' && !(Number(i.amount) > 0));
   const bitti = checks.filter((i) => i.is_done).length;
   const etiket = gunEtiketi(plan, T, t);
   const tarih = plan.starts_on
@@ -171,6 +173,9 @@ function PlanCard({ t, locale, plan, T, onOpen, baseCurrency, rates, repo, tick 
           {checks.length > 0 && <span className="faint">✓ {bitti}/{checks.length}</span>}
         </span>
       </button>
+      {!paraGoster && actual > 0 && (
+        <div className="faint" style={{ marginTop: 'var(--sp-2)' }}>💸 {t('plans.spent')}: {formatMoney(actual, cur)}</div>
+      )}
       {paraGoster && (
         <div style={{ marginTop: 'var(--sp-3)' }}>
           <div className="between faint"><span>{isGoal ? t('plans.progress') : t('plans.actual')}: {formatMoney(progress, cur)}</span><span>{isGoal ? t('plans.target') : t('plans.budget')}: {formatMoney(target, cur)}</span></div>
@@ -226,14 +231,15 @@ function PlanDetail({ t, locale, plan, onClose, repo, tick, bump, baseCurrency, 
       <Chips value={sub} onChange={setSub} options={[
         { value: 'items', label: '📋 ' + t('plans.items') },
         ...(isGoal ? [{ value: 'contrib', label: '🐖 ' + t('plans.contributions') }] : []),
-        ...(!isGoal && para ? [{ value: 'expense', label: '💸 ' + t('quick.expense') }] : []),
         { value: 'task', label: '✅ ' + t('quick.task') },
         { value: 'edit', label: '⚙️ ' + t('common.edit') }]} />
       <div className="spacer" />
       {sub === 'items' && (
         <>
+          {!isGoal && <Masraflar t={t} plan={plan} cat={cat} items={items} repo={repo} bump={bump} cur={cur} />}
           {turler.map(([k, label]) => {
-            const rows = items.filter((i) => i.kind === k);
+            // Tutarı olan kalemler masraftır; yukarıdaki kartta duruyor.
+            const rows = items.filter((i) => i.kind === k && !(Number(i.amount) > 0));
             if (!rows.length) return null;
             return (
               <Card key={k} title={label} className="card--flat">
@@ -242,7 +248,7 @@ function PlanDetail({ t, locale, plan, onClose, repo, tick, bump, baseCurrency, 
                     icon={k === 'checklist' ? <input type="checkbox" checked={i.is_done} onChange={async () => { await repo.plans.updateItem(i.id, { is_done: !i.is_done }); bump(); }} style={{ width: 22, height: 22 }} /> : k === 'guest' ? <button type="button" onClick={async () => { const order = ['invited', 'yes', 'maybe', 'no']; await repo.plans.updateItem(i.id, { rsvp: order[(order.indexOf(i.rsvp) + 1) % 4] }); bump(); }}>{RSVP[i.rsvp] || '⏳'}</button> : k === 'booking' ? (i.is_done ? '✅' : '🎫') : k === 'itinerary' ? '📍' : '📝'}
                     title={i.title} done={k === 'checklist' && i.is_done}
                     sub={[i.on_date && fmtDay(i.on_date), i.ref_code, i.assignee_member_id && memberById(i.assignee_member_id)?.display_name, i.guest_count && t('plans.people', i.guest_count)].filter(Boolean).join(' · ')}
-                    end={i.amount ? <span className="money">{formatMoney(i.amount, i.currency || cur)}</span> : null} />
+                    end={null} />
                 ))}
               </Card>
             );
@@ -256,10 +262,14 @@ function PlanDetail({ t, locale, plan, onClose, repo, tick, bump, baseCurrency, 
           </form>
         </>
       )}
-      {sub === 'expense' && <ExpenseForm planId={plan.id} onDone={() => setSub('items')} />}
       {sub === 'task' && <TaskForm planId={plan.id} onDone={() => setSub('items')} />}
       {sub === 'contrib' && <Contributions t={t} plan={plan} repo={repo} tick={tick} bump={bump} cur={cur} baseCurrency={baseCurrency} rates={rates} />}
-      {sub === 'edit' && <PlanForm t={t} plan={plan} onDone={onClose} />}
+      {sub === 'edit' && (
+        <>
+          <PlanForm t={t} plan={plan} onDone={onClose} />
+          <PlanSil t={t} plan={plan} repo={repo} bump={bump} onDone={onClose} />
+        </>
+      )}
     </Sheet>
   );
 }
@@ -312,7 +322,11 @@ function PlanForm({ t, onDone, plan, categoryKey }) {
         status: editing ? status : (s ? 'planned' : 'idea'),
       };
       if (editing) {
-        await repo.plans.update(plan.id, row);
+        const turDegisti = planCategory(plan).key !== cat.key;
+        await repo.plans.update(plan.id, {
+          ...row,
+          ...(turDegisti ? { category: cat.key, kind: cat.kind, icon: cat.emoji } : {}),
+        });
       } else {
         const yeni = await repo.plans.create({ ...row, kind: cat.kind, category: cat.key, icon: cat.emoji });
         if (liste && yeni?.id) {
@@ -327,10 +341,14 @@ function PlanForm({ t, onDone, plan, categoryKey }) {
 
   return (
     <form onSubmit={submit}>
-      {!editing && (
+      {/* Tür düzenlemede de değişebilir (yanlış türle açılan plan düzeltilebilsin);
+          yalnızca birikim hedefi ile diğerleri arasında geçiş yok — hedefin
+          ilerlemesi katkılardan geliyor, diğerlerininki harcamadan. */}
+      {!(editing && plan.kind === 'goal') && (
         <Field label={t('plans.category')}>
           <select className="select" value={catKey} onChange={(x) => kategoriSec(x.target.value)}>
-            {PLAN_CATEGORIES.map((c) => <option key={c.key} value={c.key}>{c.emoji} {categoryName(c, locale)}</option>)}
+            {PLAN_CATEGORIES.filter((c) => !editing || c.kind !== 'goal')
+              .map((c) => <option key={c.key} value={c.key}>{c.emoji} {categoryName(c, locale)}</option>)}
           </select>
         </Field>
       )}
@@ -442,5 +460,108 @@ function Contributions({ t, plan, repo, tick, bump, cur, baseCurrency, rates }) 
       )}
       {rows && rows.length === 0 && <Empty>{t('plans.noContributions')}</Empty>}
     </>
+  );
+}
+
+/** Harcama formunun hatırladığı son hesap (QuickAdd ile aynı anahtar). */
+function sonHesap() {
+  try { return JSON.parse(localStorage.getItem('yuva:quick:last') || '{}').accountId || null; } catch { return null; }
+}
+
+/**
+ * MASRAFLAR (0028) — "pasta götüreceğiz, 15.000", "kort ücreti 10.000".
+ *
+ * Ödendi işaretli masraf kendiliğinden Bütçe'ye harcama olarak düşer (aile
+ * harcaması, bu plana bağlı). İşaret kaldırılırsa harcama da kalkar. Henüz
+ * ödenmemiş masraf planda "ödenecek" olarak bekler; ödendiği gün kutusuna
+ * dokunmak yeter. Kategori plan türünden tahmin ediliyor.
+ */
+function Masraflar({ t, plan, cat, items, repo, bump, cur }) {
+  const { categories } = useApp();
+  const T = today();
+  const masraflar = items.filter((i) => Number(i.amount) > 0);
+  const [baslik, setBaslik] = useState('');
+  const [tutar, setTutar] = useState('');
+  // Plan bugün ya da geçmişteyse (ya da tarihsizse) büyük ihtimalle ödendi.
+  const [odendi, setOdendi] = useState(!plan.starts_on || plan.starts_on <= T);
+  const [soru, setSoru] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [hata, setHata] = useState('');
+
+  const toplam = masraflar.reduce((s, i) => s + Number(i.amount), 0);
+  const odenen = masraflar.filter((i) => i.is_done).reduce((s, i) => s + Number(i.amount), 0);
+
+  const ekle = async (e) => {
+    e.preventDefault(); setHata('');
+    const minor = parseAmount(tutar, cur);
+    if (!baslik.trim() || !minor) return;
+    setBusy(true);
+    try {
+      await repo.plans.addItem({
+        plan_id: plan.id, kind: 'checklist', title: baslik.trim(),
+        amount: minorToDecimal(minor, cur), currency: cur, is_done: odendi,
+        category_id: presetCategoryId(PLAN_COST_CATEGORY[cat.key], categories) || null,
+        account_id: sonHesap(),
+      });
+      setBaslik(''); setTutar(''); bump();
+    } catch (ex) { setHata(ex.message); } finally { setBusy(false); }
+  };
+
+  return (
+    <Card title={`💸 ${t('plans.costs')}`}
+      action={masraflar.length ? <span className="faint">{t('plans.costSummary', formatMoney(odenen, cur), formatMoney(toplam, cur))}</span> : null}>
+      {masraflar.map((i) => (
+        <Row key={i.id}
+          icon={<input type="checkbox" checked={i.is_done} aria-label={t('plans.paidNow')} style={{ width: 22, height: 22 }}
+            onChange={async () => { await repo.plans.updateItem(i.id, { is_done: !i.is_done }); bump(); }} />}
+          title={i.title}
+          sub={i.is_done ? `✓ ${t('plans.costPaid')}` : t('plans.costDue')}
+          end={<span className="inline" style={{ flexWrap: 'nowrap' }}>
+            <span className="money">{formatMoney(i.amount, i.currency || cur)}</span>
+            <button type="button" className={'btn btn--sm ' + (soru === i.id ? 'btn--danger' : 'btn--ghost')}
+              aria-label={t('common.delete')}
+              onClick={async () => {
+                if (soru !== i.id) { setSoru(i.id); return; }
+                setSoru(null); await repo.plans.removeItem(i.id); bump();
+              }}>{soru === i.id ? t('album.confirmDelete') : '✕'}</button>
+          </span>} />
+      ))}
+      <form onSubmit={ekle} style={{ marginTop: 'var(--sp-2)' }}>
+        <div className="grid-2">
+          <input className="input" value={baslik} placeholder={t('plans.costHint')} aria-label={t('plans.costTitle')}
+            onChange={(e) => setBaslik(e.target.value)} />
+          <input className="input" inputMode="decimal" value={tutar} placeholder={`0 ${cur}`} aria-label={t('money.amount')}
+            onChange={(e) => setTutar(e.target.value)} />
+        </div>
+        <label className="inline" style={{ margin: 'var(--sp-2) 0' }}>
+          <input type="checkbox" checked={odendi} onChange={(e) => setOdendi(e.target.checked)} style={{ width: 22, height: 22 }} />
+          {t('plans.paidNow')}
+        </label>
+        {hata && <div className="banner" style={{ color: 'var(--color-danger)' }}>{hata}</div>}
+        <button className="btn btn--outline btn--block" disabled={busy}>+ {t('plans.addCost')}</button>
+      </form>
+    </Card>
+  );
+}
+
+/** Planı sil — iki dokunuş. Ödenmiş masraflar Bütçe'de kalır (0028). */
+function PlanSil({ t, plan, repo, bump, onDone }) {
+  const [soru, setSoru] = useState(false);
+  const [busy, setBusy] = useState(false);
+  if (!soru) {
+    return <button type="button" className="btn btn--ghost btn--block" style={{ marginTop: 'var(--sp-3)', color: 'var(--color-danger)' }}
+      onClick={() => setSoru(true)}>🗑️ {t('plans.deletePlan')}</button>;
+  }
+  return (
+    <div style={{ marginTop: 'var(--sp-3)' }}>
+      <div className="faint" style={{ marginBottom: 'var(--sp-2)' }}>{t('plans.deletePlanConfirm', plan.title)}</div>
+      <div className="grid-2">
+        <button type="button" className="btn btn--ghost" onClick={() => setSoru(false)}>{t('common.cancel')}</button>
+        <button type="button" className="btn btn--danger" disabled={busy}
+          onClick={async () => { setBusy(true); try { await repo.plans.remove(plan.id); bump(); onDone(); } finally { setBusy(false); } }}>
+          {t('common.yesDelete')}
+        </button>
+      </div>
+    </div>
   );
 }
