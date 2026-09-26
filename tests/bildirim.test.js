@@ -73,3 +73,15 @@ test('olay formunda hatırlatma seçimi var ve kapatılabiliyor', () => {
   assert.match(q, /reminder_minutes:/);
   assert.match(q, /notify: hatirlat !== 'off'/);
 });
+
+test('haftalık özet (0030): zamanlayıcıya bağlı, iç fonksiyon API’ye kapalı, tercihler iki dilde', () => {
+  const sql = readFileSync(new URL('../supabase/migrations/0030_haftalik_ozet.sql', import.meta.url), 'utf8');
+  assert.match(sql, /perform public\.push_schedule_weekly\(now\(\)\)/);
+  assert.match(sql, /revoke all on function public\.weekly_digest\(uuid, date\) from public, anon, authenticated/);
+  assert.match(sql, /grant execute on function public\.weekly_digest_preview\(uuid\) to authenticated/);
+  // Eşin kişisel harcaması özete girmez: yalnızca kendi for_member_id'm.
+  assert.match(sql, /for_member_id = p_member/);
+  assert.doesNotMatch(sql, /for_member_id is not null/);
+  const ui = readFileSync(new URL('../components/BildirimAyarlari.jsx', import.meta.url), 'utf8');
+  assert.match(ui, /k="weekly"/);
+});

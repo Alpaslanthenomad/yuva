@@ -19,6 +19,30 @@ const LEADS = [0, 10, 30, 60, 120, 1440];
  * İzin penceresi yalnızca kullanıcının dokunuşuyla açılabilir (tarayıcı
  * kuralı); bu yüzden sayfa açılır açılmaz izin istenmiyor.
  */
+/**
+ * Pazar akşamı gelecek özetin şimdiki hali — "ne gelecek?" sorusunu
+ * bildirimi beklemeden cevaplamak için (0030).
+ */
+function HaftalikOnizleme({ t, repo }) {
+  const [ozet, setOzet] = useState(undefined);
+  const [busy, setBusy] = useState(false);
+  const bak = async () => {
+    setBusy(true);
+    try { setOzet(await repo.push.weeklyPreview()); } catch { setOzet(null); } finally { setBusy(false); }
+  };
+  return (
+    <div style={{ margin: 'var(--sp-2) 0 var(--sp-3)' }}>
+      <button type="button" className="btn btn--ghost btn--sm" disabled={busy} onClick={bak}>👁️ {t('notify.weeklyPreview')}</button>
+      {ozet !== undefined && (
+        <div className="ozet-onizleme">
+          {ozet ? (<><b>{ozet.title}</b>{(ozet.parts || []).map((x) => <div key={x}>{x}</div>)}</>)
+            : <span className="faint">{t('notify.weeklyEmpty')}</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function BildirimAyarlari({ kompakt = false }) {
   const { repo } = useApp();
   const t = useT();
@@ -128,6 +152,13 @@ export default function BildirimAyarlari({ kompakt = false }) {
               disabled={!prefs.goals} onChange={(e) => e.target.value && yaz({ goals_at: e.target.value })} />
           </Anahtar>
           <Anahtar k="digest" label={t('notify.digest')} />
+          <Anahtar k="weekly" label={t('notify.weekly')}>
+            <select className="select" style={{ width: 110 }} value={String(prefs.weekly_at || '19:00').slice(0, 5)}
+              disabled={!prefs.weekly} onChange={(e) => yaz({ weekly_at: e.target.value })}>
+              {['17:00', '18:00', '19:00', '20:00', '21:00'].map((h) => <option key={h} value={h}>{h}</option>)}
+            </select>
+          </Anahtar>
+          <HaftalikOnizleme t={t} repo={repo} />
           <div className="faint" style={{ marginTop: 'var(--sp-2)' }}>{t('notify.privateNote')}</div>
         </>
       )}
