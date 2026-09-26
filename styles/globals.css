@@ -573,3 +573,7 @@ input[type="time"].input, input[type="date"].input {
 .chips-wrap { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
 .bill-onay { margin-top: var(--sp-2); padding: var(--sp-2) var(--sp-3); border-radius: var(--radius-md); background: var(--color-brand-soft); }
 .bill-onay .faint { color: var(--color-brand-ink); }
+
+/* Birikim hedefi: otomatik aylık katkı */
+.oto-katki { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); padding: var(--sp-3); border-radius: var(--radius-md); background: var(--color-surface-2); }
+.oto-katki--form { flex-direction: column; align-items: stretch; }

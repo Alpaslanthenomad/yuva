@@ -23,20 +23,21 @@ const LEADS = [0, 10, 30, 60, 120, 1440];
  * Pazar akşamı gelecek özetin şimdiki hali — "ne gelecek?" sorusunu
  * bildirimi beklemeden cevaplamak için (0030).
  */
-function HaftalikOnizleme({ t, repo }) {
+function HaftalikOnizleme({ t, repo, aylik = false }) {
   const [ozet, setOzet] = useState(undefined);
   const [busy, setBusy] = useState(false);
   const bak = async () => {
     setBusy(true);
-    try { setOzet(await repo.push.weeklyPreview()); } catch { setOzet(null); } finally { setBusy(false); }
+    try { setOzet(await (aylik ? repo.push.monthlyPreview() : repo.push.weeklyPreview())); }
+    catch { setOzet(null); } finally { setBusy(false); }
   };
   return (
     <div style={{ margin: 'var(--sp-2) 0 var(--sp-3)' }}>
-      <button type="button" className="btn btn--ghost btn--sm" disabled={busy} onClick={bak}>👁️ {t('notify.weeklyPreview')}</button>
+      <button type="button" className="btn btn--ghost btn--sm" disabled={busy} onClick={bak}>👁️ {t(aylik ? 'notify.monthlyPreview' : 'notify.weeklyPreview')}</button>
       {ozet !== undefined && (
         <div className="ozet-onizleme">
           {ozet ? (<><b>{ozet.title}</b>{(ozet.parts || []).map((x) => <div key={x}>{x}</div>)}</>)
-            : <span className="faint">{t('notify.weeklyEmpty')}</span>}
+            : <span className="faint">{t(aylik ? 'notify.monthlyEmpty' : 'notify.weeklyEmpty')}</span>}
         </div>
       )}
     </div>
@@ -161,6 +162,8 @@ export default function BildirimAyarlari({ kompakt = false }) {
             </select>
           </Anahtar>
           <HaftalikOnizleme t={t} repo={repo} />
+          <Anahtar k="monthly" label={t('notify.monthly')} />
+          <HaftalikOnizleme t={t} repo={repo} aylik />
           <div className="faint" style={{ marginTop: 'var(--sp-2)' }}>{t('notify.privateNote')}</div>
         </>
       )}

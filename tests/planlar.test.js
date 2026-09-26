@@ -117,3 +117,14 @@ test('hediye planı demo deposunda önemli güne bağlı kaydediliyor', async ()
   assert.ok(hediyePlani(await repo.plans.list(), o));
   assert.equal(p.occasion_id, o.id);
 });
+
+test('otomatik katkı ayarı hedefe kaydedilir ve kapatılabilir (0034)', async () => {
+  const repo = makeDemoRepo(); repo.reset('tr');
+  const g = await repo.plans.create({ title: 'Tatil fonu', kind: 'goal', category: 'goal', target_amount: 1000000, budget_currency: 'CLP' });
+  await repo.plans.update(g.id, { auto_amount: 50000, auto_day: 5 });
+  let p = (await repo.plans.list()).find((x) => x.id === g.id);
+  assert.equal(p.auto_amount, 50000); assert.equal(p.auto_day, 5);
+  await repo.plans.update(g.id, { auto_amount: null, auto_day: null });
+  p = (await repo.plans.list()).find((x) => x.id === g.id);
+  assert.equal(p.auto_amount, null);
+});

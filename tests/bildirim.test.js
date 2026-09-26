@@ -93,3 +93,16 @@ test('hediye hatırlatması (0032): zamanlayıcıya bağlı, kendi gününe gitm
   assert.match(sql, /coalesce\(p\.occasions, true\)/);
   assert.match(sql, /occasions\s+= coalesce\(\(p->>'occasions'\)::boolean, occasions\)/);
 });
+
+test('otomatik katkı ve ay sonu özeti (0034): zamanlayıcıya bağlı, API’ye kapalı, eşin kişiseli yok', () => {
+  const sql = readFileSync(new URL('../supabase/migrations/0034_birikim_ve_ay_sonu.sql', import.meta.url), 'utf8');
+  assert.match(sql, /perform public\.goal_auto_tick\(now\(\)\)/);
+  assert.match(sql, /perform public\.push_schedule_monthly\(now\(\)\)/);
+  assert.match(sql, /revoke all on function public\.monthly_digest\(uuid, character\) from public, anon, authenticated/);
+  assert.match(sql, /revoke all on function public\.goal_auto_tick\(timestamptz\) from public, anon, authenticated/);
+  assert.match(sql, /for_member_id = p_member/);
+  assert.doesNotMatch(sql, /for_member_id is not null/);
+  // Hedefe ulaşınca durur; aynı ay iki kez yazmaz.
+  assert.match(sql, /toplam >= g\.target_amount/);
+  assert.match(sql, /g\.auto_last >= hedef_gun/);
+});

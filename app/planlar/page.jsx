@@ -471,9 +471,10 @@ function Contributions({ t, plan, repo, tick, bump, cur, baseCurrency, rates }) 
           <div className="stat"><div className="stat__label">{t('plans.remaining')}</div><div className="stat__value">{formatMoney(Math.max(0, target - done), cur, { compact: true })}</div></div>
         </div>
       )}
+      <OtomatikKatki t={t} plan={plan} repo={repo} bump={bump} cur={cur} />
       <form onSubmit={submit}>
         <div className="grid-2">
-          <Field label={t('money.amount')}><input className="input" inputMode="decimal" autoFocus value={amount} onChange={(x) => setAmount(x.target.value)} /></Field>
+          <Field label={t('money.amount')}><input className="input" inputMode="decimal" value={amount} onChange={(x) => setAmount(x.target.value)} /></Field>
           <Field label={t('money.currency')}><select className="select" value={ccy} onChange={(x) => setCcy(x.target.value)}>{CURRENCY_CODES.map((c) => <option key={c}>{c}</option>)}</select></Field>
         </div>
         <div className="grid-2">
@@ -494,6 +495,69 @@ function Contributions({ t, plan, repo, tick, bump, cur, baseCurrency, rates }) 
       )}
       {rows && rows.length === 0 && <Empty>{t('plans.noContributions')}</Empty>}
     </>
+  );
+}
+
+/**
+ * Birikim hedefine otomatik aylık katkı (0034). Kapalıyken tek satır; açınca
+ * tutar ve ayın günü. Sunucu o gün (08:00'den sonra) katkıyı yazar ve
+ * bildirim gönderir; hedefe ulaşınca kendiliğinden durur.
+ */
+function OtomatikKatki({ t, plan, repo, bump, cur }) {
+  const acik = Number(plan.auto_amount) > 0 && plan.auto_day;
+  const [duzen, setDuzen] = useState(false);
+  const [tutar, setTutar] = useState(acik ? String(Number(plan.auto_amount)) : '');
+  const [gun, setGun] = useState(String(plan.auto_day || 1));
+  const [busy, setBusy] = useState(false);
+  const para = plan.budget_currency || cur;
+
+  const kaydet = async (e) => {
+    e.preventDefault();
+    const minor = parseAmount(tutar, para); if (!minor) return;
+    setBusy(true);
+    try { await repo.plans.update(plan.id, { auto_amount: minorToDecimal(minor, para), auto_day: Number(gun) }); setDuzen(false); bump(); }
+    finally { setBusy(false); }
+  };
+  const kapat = async () => {
+    setBusy(true);
+    try { await repo.plans.update(plan.id, { auto_amount: null, auto_day: null }); setDuzen(false); setTutar(''); bump(); }
+    finally { setBusy(false); }
+  };
+
+  if (!duzen) {
+    return (
+      <div className="oto-katki" style={{ marginBottom: 'var(--sp-3)' }}>
+        <div>
+          <b>🔁 {t('plans.autoTitle')}</b>
+          <div className="faint">{acik ? t('plans.autoOn', plan.auto_day, formatMoney(plan.auto_amount, para)) : t('plans.autoOff')}</div>
+        </div>
+        <button type="button" className={'btn btn--sm' + (acik ? ' btn--ghost' : ' btn--outline')} onClick={() => setDuzen(true)}>
+          {acik ? t('common.edit') : t('plans.autoSetup')}
+        </button>
+      </div>
+    );
+  }
+  return (
+    <form onSubmit={kaydet} className="oto-katki oto-katki--form" style={{ marginBottom: 'var(--sp-3)' }}>
+      <b>🔁 {t('plans.autoTitle')}</b>
+      <div className="grid-2">
+        <Field label={`${t('money.amount')} (${para})`}>
+          <input className="input" inputMode="decimal" value={tutar} onChange={(x) => setTutar(x.target.value)} />
+        </Field>
+        <Field label={t('plans.autoDay')}>
+          <select className="select" value={gun} onChange={(x) => setGun(x.target.value)}>
+            {Array.from({ length: 28 }, (_, i) => String(i + 1)).map((d) => <option key={d} value={d}>{d}</option>)}
+          </select>
+        </Field>
+      </div>
+      <div className="faint" style={{ fontSize: 'var(--fs-xs)' }}>{t('plans.autoHint')}</div>
+      <div className="grid-2" style={{ marginTop: 'var(--sp-2)' }}>
+        <button type="button" className="btn btn--ghost" onClick={() => (acik ? kapat() : setDuzen(false))} disabled={busy}>
+          {acik ? t('plans.autoStop') : t('common.cancel')}
+        </button>
+        <button className="btn" disabled={busy}>{t('common.save')}</button>
+      </div>
+    </form>
   );
 }
 
