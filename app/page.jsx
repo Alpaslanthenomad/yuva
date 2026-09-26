@@ -150,7 +150,14 @@ export default function TodayPage() {
           <Row key={d.id} icon="🪪" title={d.title} sub={d.daysLeft < 0 ? t('family.expired') : t('family.expiresIn', d.daysLeft)} end={<span className={'tag ' + (d.daysLeft <= 30 ? 'tag--danger' : 'tag--warn')}>{fmtDay(d.expires_on)}</span>} />
         ))}
         {agenda.bills.map((b) => (
-          <Row key={b.id} icon="🧾" title={b.name} sub={relativeLabel(b.next_due_on)} end={<Money amount={b.amount} currency={b.currency} kind={b.kind} />} />
+          <Row key={b.id} icon="🧾" title={b.name} sub={relativeLabel(b.next_due_on) + (b.auto_post ? ' · ⚙︎ ' + t('money.autoPost') : '')}
+            end={<Money amount={b.amount} currency={b.currency} kind={b.kind} />}>
+            {!b.auto_post && b.kind === 'expense' && (
+              <div style={{ marginTop: 'var(--sp-2)' }}>
+                <a className="btn btn--outline btn--sm" href={`/para/?sekme=accounts&ode=${b.id}`}>✓ {t('bills.paid')}</a>
+              </div>
+            )}
+          </Row>
         ))}
       </Card>
       )}

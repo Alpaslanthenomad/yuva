@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import DuzenliOdemeler from '../../components/DuzenliOdemeler.jsx';
 import { useApp } from '../../components/AppShell.jsx';
 import { Card, Row, Money, Bar, Chips, Seg, Empty, Sheet, Field } from '../../components/ui.jsx';
 import { ExpenseForm } from '../../components/QuickAdd.jsx';
@@ -16,6 +17,17 @@ export default function MoneyPage() {
   const { repo, household, baseCurrency, categoryById, memberById, accountById, categories, members, tick, bump } = useApp();
   const t = useT();
   const [tab, setTab] = useState('overview');
+  // Bildirimden / Bugün ekranından gelinen sekme ve "Ödendi" onayı (0033):
+  // /para/?sekme=accounts&ode=<düzenli ödeme>
+  const [odeId, setOdeId] = useState(null);
+  useEffect(() => {
+    try {
+      const q = new URLSearchParams(window.location.search);
+      const s = q.get('sekme');
+      if (s && ['overview', 'transactions', 'report', 'budgets', 'accounts'].includes(s)) setTab(s);
+      if (q.get('ode')) setOdeId(q.get('ode'));
+    } catch { /* adres okunamazsa varsayılan */ }
+  }, []);
   const [period, setPeriod] = useState(periodOf(today()));
   const [d, setD] = useState(null);
   const [adding, setAdding] = useState(false);
@@ -231,16 +243,7 @@ export default function MoneyPage() {
         </Card>
       )}
 
-      {tab === 'accounts' && (
-        <Card title={t('money.upcomingBills')}>
-          {bills.map((b) => (
-            <Row key={b.id} icon={categoryById(b.category_id)?.icon || '🧾'} title={b.name} sub={`${t('money.nextDue')}: ${fmtDay(b.next_due_on)} · ${relativeLabel(b.next_due_on)}${b.auto_post ? ' · ⚙︎ ' + t('money.autoPost') : ''}`} end={<Money amount={b.amount} currency={b.currency} kind={b.kind} />} />
-          ))}
-          {bills.length === 0 && <Empty>{t('common.empty')}</Empty>}
-          <div className="spacer" />
-          <div className="between muted"><span>{t('money.monthlyFixed')}</span><span className="money">{formatMoney(bills.filter((b) => b.kind === 'expense' && b.currency === baseCurrency).reduce((s, b) => s + Number(b.amount), 0), baseCurrency)} +</span></div>
-        </Card>
-      )}
+      {tab === 'accounts' && <DuzenliOdemeler bills={bills} baseCurrency={baseCurrency} odeId={odeId} />}
 
       {adding && <Sheet onClose={() => setAdding(false)} title={t('money.addTxn')}><ExpenseForm onDone={() => setAdding(false)} /></Sheet>}
       {editTxn && (
