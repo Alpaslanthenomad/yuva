@@ -181,8 +181,16 @@ function Duzen({ repo, t, yukle, bump, takviye }) {
         {bloklar.map((b) => (
           <Row key={b.id} icon={b.icon || '•'} title={b.title}
             sub={`${String(b.starts_at).slice(0, 5)} – ${String(b.ends_at).slice(0, 5)}`}
-            end={<button type="button" className="btn btn--ghost btn--sm"
-              onClick={async () => { await repo.personal.removeBlock(b.id); sonrasi(); }}>{t('common.delete')}</button>} />
+            end={<span className="inline" style={{ flexWrap: 'nowrap' }}>
+              {/* Bu blok başlarken bildirim gelsin mi (0026). */}
+              <button type="button" className="btn btn--ghost btn--sm" aria-pressed={b.notify !== false}
+                aria-label={t('notify.reminder')}
+                onClick={async () => { await repo.personal.updateBlock(b.id, { notify: b.notify === false }); sonrasi(); }}>
+                {b.notify === false ? '🔕' : '🔔'}
+              </button>
+              <button type="button" className="btn btn--ghost btn--sm"
+                onClick={async () => { await repo.personal.removeBlock(b.id); sonrasi(); }}>{t('common.delete')}</button>
+            </span>} />
         ))}
         <div className="spacer" />
         <BlokFormu repo={repo} t={t} scope={scope} onDone={sonrasi} />

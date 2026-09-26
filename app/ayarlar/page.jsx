@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../../components/AppShell.jsx';
 import { Card, Row, Field, Empty } from '../../components/ui.jsx';
 import ThemeSwitch from '../../components/ThemeSwitch.jsx';
+import BildirimAyarlari from '../../components/BildirimAyarlari.jsx';
 import { useT, useLocale, LanguageSwitch } from '../../lib/i18n/context.jsx';
 import { LOCALES } from '../../lib/i18n/index.js';
 import { CURRENCIES, CURRENCY_CODES } from '../../lib/money.js';
@@ -42,6 +43,8 @@ export default function SettingsPage() {
         <ThemeSwitch />
         <div className="faint" style={{ marginTop: 'var(--sp-3)' }}>{t('settings.appearanceHint')}</div>
       </Card>
+
+      <BildirimAyarlari />
 
       <Card title={t('settings.household')}>
         <form onSubmit={save}>

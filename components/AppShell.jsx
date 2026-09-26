@@ -9,6 +9,7 @@ import { fmtDay, fmtTime } from '../lib/dates.js';
 import { authScreen } from '../lib/authState.js';
 import { readStoredTheme, systemPrefersDark, resolveTheme, applyTheme } from '../lib/theme.js';
 import { yenilemeliMi, YENILENDI_ANAHTAR } from '../lib/surum.js';
+import { aboneligiTazele } from '../lib/push.js';
 
 const AppCtx = createContext(null);
 export const useApp = () => useContext(AppCtx);
@@ -233,6 +234,13 @@ export default function AppShell({ children }) {
     });
     return () => { clearTimeout(timer); if (typeof unsub === 'function') unsub(); };
   }, [repo, state.household?.id, reload, resync]);
+  // Bildirim aboneliği (0026): izin verilmişse açılışta sessizce sunucuya
+  // yeniden yazılır — tarayıcı aboneliği kendi kendine yenileyebiliyor ve
+  // eskisi sunucuda kalırsa bildirim sessizce kaybolur. İzin İSTEMEZ.
+  useEffect(() => {
+    if (state.household?.id && repo.push && !repo.push.demo) aboneligiTazele(repo);
+  }, [repo, state.household?.id]);
+
   const value = useMemo(() => ({
     repo, ...state, tick, bump, reload, locale,
     memberById: (id) => state.members.find((m) => m.id === id),

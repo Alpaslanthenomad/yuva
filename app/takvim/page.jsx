@@ -5,13 +5,28 @@ import { useApp } from '../../components/AppShell.jsx';
 import { Card, Seg, Chips, Avatars, Empty, Sheet, Row } from '../../components/ui.jsx';
 import { EventForm } from '../../components/QuickAdd.jsx';
 import { useT } from '../../lib/i18n/context.jsx';
-import { today, weekDays, monthGrid, addDays, addMonths, periodOf, fmtPeriod, fmtDayLong, fmtTime, dowNames, fromISODate, overlaps, dayInRange, freqKeyOf } from '../../lib/dates.js';
+import { today, weekDays, monthGrid, addDays, addMonths, periodOf, fmtPeriod, fmtDayLong, fmtTime, dowNames, monthNames, fromISODate, overlaps, dayInRange, freqKeyOf } from '../../lib/dates.js';
 import { holidayMap } from '../../lib/holidays.js';
+
+/** Hafta görünümünün başlığı: iki gün numarası ve ay adı. */
+function haftaEtiketi(sel) {
+  const w = weekDays(sel);
+  const a = fromISODate(w[0]); const b = fromISODate(w[6]);
+  const ay = (d) => monthNames()[d.getMonth()];
+  return a.getMonth() === b.getMonth()
+    ? `${a.getDate()} – ${b.getDate()} ${ay(b)}`
+    : `${a.getDate()} ${ay(a)} – ${b.getDate()} ${ay(b)}`;
+}
 
 export default function CalendarPage() {
   const { repo, members, memberById, household, tick, bump, locale } = useApp();
   const t = useT();
-  const [view, setView] = useState('week');
+  // Görünüm cihazda hatırlanıyor: ayı açık bırakan, ertesi gün de ayı görsün.
+  const [view, setViewRaw] = useState('week');
+  useEffect(() => {
+    try { const v = localStorage.getItem('yuva:takvim:gorunum'); if (['week', 'month', 'agenda'].includes(v)) setViewRaw(v); } catch { /* */ }
+  }, []);
+  const setView = (v) => { setViewRaw(v); try { localStorage.setItem('yuva:takvim:gorunum', v); } catch { /* */ } };
   const [sel, setSel] = useState(today());
   const [filter, setFilter] = useState('all');
   const [events, setEvents] = useState([]);
@@ -63,17 +78,23 @@ export default function CalendarPage() {
   return (
     <>
       <div className="page-head">
-        <div>
-          <h1 className="h1">{t('calendar.title')}</h1>
-          <div className="page-head__sub">{view === 'month' ? fmtPeriod(periodOf(sel)) : fmtDayLong(sel)}</div>
-        </div>
+        <h1 className="h1">{t('calendar.title')}</h1>
         <Seg value={view} onChange={setView} options={[{ value: 'week', label: t('calendar.week') }, { value: 'month', label: t('calendar.month') }, { value: 'agenda', label: t('calendar.agenda') }]} />
       </div>
 
-      <div className="between" style={{ marginBottom: 'var(--sp-3)' }}>
-        <button className="btn btn--ghost btn--sm" onClick={() => nav(-1)}>‹</button>
+      {/* Dönem başlığı okların ARASINDA: hangi ayda/haftada olduğun ve nasıl
+          ileri-geri gidileceği tek satırda. Önceden oklar üye filtresinin iki
+          yanındaydı ve filtreyi kaydıran bir şey gibi görünüyordu. */}
+      <div className="cal-nav">
+        <button type="button" className="btn btn--ghost btn--sm" onClick={() => nav(-1)} aria-label="‹">‹</button>
+        <button type="button" className="cal-nav__label" onClick={() => setSel(T)}>
+          {view === 'month' ? fmtPeriod(periodOf(sel)) : view === 'agenda' ? fmtDayLong(sel) : haftaEtiketi(sel)}
+          {sel !== T && <span className="faint"> · {t('calendar.backToday')}</span>}
+        </button>
+        <button type="button" className="btn btn--ghost btn--sm" onClick={() => nav(1)} aria-label="›">›</button>
+      </div>
+      <div style={{ marginBottom: 'var(--sp-3)' }}>
         <Chips value={filter} onChange={setFilter} options={[{ value: 'all', label: t('common.all') }, ...members.map((m) => ({ value: m.id, label: `${m.avatar_emoji} ${m.display_name}` }))]} />
-        <button className="btn btn--ghost btn--sm" onClick={() => nav(1)}>›</button>
       </div>
 
       {view === 'week' && (
@@ -92,27 +113,44 @@ export default function CalendarPage() {
                 );
               })}
             </div>
+            <button type="button" className="cal-expand" onClick={() => setView('month')}>⌄ {t('calendar.showMonth')}</button>
           </Card>
           <DayList t={t} day={sel} events={byDay(sel)} holidays={holidays} memberById={memberById} conflicts={conflicts} colorOf={colorOf} onOpen={setOpen} plans={plansOn(sel)} />
         </>
       )}
 
+      {/* AY: güne dokunmak artık haftaya ATMIYOR; o günün listesi hemen
+          altta açılıyor. Kullanıcı yalnızca bir haftayı görebildiğini
+          söylüyordu — ay görünümü vardı ama bir güne dokununca haftaya geri
+          dönüyordu, yani ayda kalmanın yolu yoktu. Hücrelerde yazı yerine
+          renkli nokta: 390 px'lik ekranda yedi sütuna sığan tek şey bu. */}
       {view === 'month' && (
-        <Card>
-          <div className="month-grid">
-            {DOW.map((d) => <div key={d} className="month-grid__dow">{d}</div>)}
-            {monthGrid(periodOf(sel)).map((d) => {
-              const evs = byDay(d);
-              return (
-                <button key={d} className={'month-cell' + (periodOf(d) !== periodOf(sel) ? ' month-cell--out' : '') + (d === T ? ' month-cell--today' : '')} onClick={() => { setSel(d); setView('week'); }} style={{ textAlign: 'left' }}>
-                  <span className="month-cell__num" style={holidays[d] ? { color: 'var(--color-expense)' } : undefined}>{fromISODate(d).getDate()}</span>
-                  {evs.slice(0, 2).map((e) => <span key={e.id + e.date} className="month-cell__pill" style={{ background: colorOf(e) }}>{e.title}</span>)}
-                  {evs.length > 2 && <span className="faint" style={{ fontSize: 10 }}>+{evs.length - 2}</span>}
-                </button>
-              );
-            })}
-          </div>
-        </Card>
+        <>
+          <Card>
+            <div className="month-grid">
+              {DOW.map((d) => <div key={d} className="month-grid__dow">{d}</div>)}
+              {monthGrid(periodOf(sel)).map((d) => {
+                const evs = byDay(d);
+                const colors = [...new Set(evs.map(colorOf))].slice(0, 3);
+                const planli = plansOn(d)[0]?.plan;
+                return (
+                  <button type="button" key={d}
+                    className={'month-cell' + (periodOf(d) !== periodOf(sel) ? ' month-cell--out' : '') + (d === T ? ' month-cell--today' : '') + (d === sel ? ' month-cell--selected' : '') + (holidays[d] ? ' month-cell--holiday' : '')}
+                    onClick={() => setSel(d)} aria-pressed={d === sel}>
+                    <span className="month-cell__num">{fromISODate(d).getDate()}</span>
+                    <span className="month-cell__dots">
+                      {colors.map((c) => <span key={c} className="dot" style={{ background: c }} />)}
+                      {evs.length > 3 && <span className="month-cell__more">+</span>}
+                    </span>
+                    {planli && <span className="month-cell__plan" title={planli.title}>{planli.icon || '🧭'}</span>}
+                  </button>
+                );
+              })}
+            </div>
+            <button type="button" className="cal-expand" onClick={() => setView('week')}>⌃ {t('calendar.showWeek')}</button>
+          </Card>
+          <DayList t={t} day={sel} events={byDay(sel)} holidays={holidays} memberById={memberById} conflicts={conflicts} colorOf={colorOf} onOpen={setOpen} plans={plansOn(sel)} title={fmtDayLong(sel)} />
+        </>
       )}
 
       {view === 'agenda' && (
@@ -172,9 +210,9 @@ export default function CalendarPage() {
   );
 }
 
-function DayList({ t, day, events, holidays, memberById, conflicts, colorOf, onOpen, compact, plans = [] }) {
+function DayList({ t, day, events, holidays, memberById, conflicts, colorOf, onOpen, compact, plans = [], title }) {
   return (
-    <Card title={compact ? fmtDayLong(day) : undefined}>
+    <Card title={title || (compact ? fmtDayLong(day) : undefined)}>
       {/* Plan bandı en üstte: o gün bir seyahat veya etkinlik sürüyorsa bağlamı verir. */}
       {plans.map(({ plan, span }) => (
         <Link className="event" key={plan.id} href="/planlar/" style={{ textDecoration: 'none', color: 'inherit' }}>
@@ -182,7 +220,7 @@ function DayList({ t, day, events, holidays, memberById, conflicts, colorOf, onO
           <div className="event__bar" style={{ background: plan.color || 'var(--color-brand)' }} />
           <div style={{ flex: 1 }}>
             <div className="event__title">{plan.title}</div>
-            <div className="event__meta">{t('plans.' + plan.kind)} · {t('today.activePlan', span.day, span.total)}</div>
+            <div className="event__meta">{plan.start_time ? String(plan.start_time).slice(0, 5) + ' · ' : ''}{plan.destination || t('plans.' + plan.kind)}{span.total > 1 ? ` · ${t('today.activePlan', span.day, span.total)}` : ''}</div>
           </div>
         </Link>
       ))}

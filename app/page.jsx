@@ -9,6 +9,7 @@ import { today, periodOf, fmtDayLong, fmtTime, relativeLabel, weekDays, dowNames
 import { formatMoney, budgetState, dailyAllowance } from '../lib/money.js';
 import { holidayMap } from '../lib/holidays.js';
 import GununKaresi from '../components/GununKaresi.jsx';
+import BildirimAyarlari from '../components/BildirimAyarlari.jsx';
 import { selamAnahtari } from '../lib/album.js';
 import { SHOPPING_CATALOG, catalogName, normalizeName } from '../lib/shoppingCatalog.js';
 
@@ -89,6 +90,10 @@ export default function TodayPage() {
           tarih ve varsa bayram altında. */}
       <GununKaresi title={t(selamAnahtari(new Date().getHours()), me?.display_name || '')}
         sub={`${fmtDayLong(T)}${holidays[T] ? ` · 🎉 ${holidays[T][0].name}` : ''}`} />
+
+      {/* Bu cihazda bildirim kapalıysa tek bir kart; açılınca ya da
+          ertelenince bir daha görünmez. */}
+      <BildirimAyarlari kompakt />
 
       {isFirstRun ? <StartCard onQuick={app.openQuick} /> : <>
 

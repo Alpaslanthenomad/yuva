@@ -78,3 +78,39 @@ self.addEventListener('fetch', (e) => {
     }
   })());
 });
+
+// ---------------------------------------------------------------------------
+// BİLDİRİMLER (0026). Sunucu şifreli bir paket gönderir; tarayıcı çözüp bu
+// olayı tetikler. Paket: { title, body, url, tag }. Aynı "tag" ile gelen yeni
+// bildirim eskisinin yerine geçer (ör. aynı olayın ikinci hatırlatması).
+self.addEventListener('push', (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch { d = { body: e.data ? e.data.text() : '' }; }
+  e.waitUntil(self.registration.showNotification(d.title || 'YUVA', {
+    body: d.body || '',
+    tag: d.tag || undefined,
+    renotify: Boolean(d.tag),
+    data: { url: d.url || '/' },
+    icon: '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
+    lang: 'tr',
+  }));
+});
+
+// Bildirime dokununca: uygulama açıksa öne getir ve ilgili sayfaya git,
+// kapalıysa o sayfayla aç.
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const hedef = new URL((e.notification.data && e.notification.data.url) || '/', self.location.origin).href;
+  e.waitUntil((async () => {
+    const pencereler = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const c of pencereler) {
+      if ('focus' in c) {
+        await c.focus();
+        if ('navigate' in c) { try { await c.navigate(hedef); } catch { /* başka kökene geçilemez */ } }
+        return;
+      }
+    }
+    await self.clients.openWindow(hedef);
+  })());
+});

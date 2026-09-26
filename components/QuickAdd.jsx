@@ -373,6 +373,13 @@ export function EventForm({ onDone, planId, date0, event }) {
   const [repeat, setRepeat] = useState(freqKeyOf(event?.rrule));
   const [att, setAtt] = useState(event?.attendees || []);
   const [location, setLocation] = useState(event?.location || '');
+  // Hatırlatma (0026). 'auto' = kişinin varsayılanı (Ayarlar'da, başlangıçta
+  // 30 dk). 'off' = bu olay için hiç bildirim yok.
+  const [hatirlat, setHatirlat] = useState(() => {
+    if (event && event.notify === false) return 'off';
+    const r = event?.reminder_minutes;
+    return Array.isArray(r) && r.length ? String(r[0]) : 'auto';
+  });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const toggle = (id) => setAtt((a) => (a.includes(id) ? a.filter((x) => x !== id) : [...a, id]));
@@ -382,7 +389,11 @@ export function EventForm({ onDone, planId, date0, event }) {
     try {
       const s = new Date(`${date}T${allDay ? '00:00' : start}:00`).toISOString();
       const en = new Date(`${date}T${allDay ? '23:59' : end}:00`).toISOString();
-      const row = { title: title.trim(), starts_at: s, ends_at: en, all_day: allDay, category, rrule: buildRRule(repeat, date), location: location || null };
+      const row = {
+        title: title.trim(), starts_at: s, ends_at: en, all_day: allDay, category, rrule: buildRRule(repeat, date), location: location || null,
+        notify: hatirlat !== 'off',
+        reminder_minutes: hatirlat === 'auto' || hatirlat === 'off' ? [] : [Number(hatirlat)],
+      };
       if (editing) {
         await repo.events.update(event.id, row);
         bump(); onDone?.(title);
@@ -427,6 +438,13 @@ export function EventForm({ onDone, planId, date0, event }) {
         </Field>
         <Field label={t('calendar.location')}><input className="input" value={location} onChange={(e) => setLocation(e.target.value)} /></Field>
       </div>
+      <Field label={'🔔 ' + t('notify.reminder')}>
+        <select className="select" value={hatirlat} onChange={(e) => setHatirlat(e.target.value)}>
+          <option value="auto">{t('calendar.reminderAuto')}</option>
+          {[0, 10, 30, 60, 120, 1440].map((n) => <option key={n} value={String(n)}>{t('notify.lead.' + n)}</option>)}
+          <option value="off">{t('calendar.reminderOff')}</option>
+        </select>
+      </Field>
       {err && <div className="banner" style={{ color: 'var(--color-danger)' }}>{err}</div>}
       <button className="btn btn--block" disabled={busy}>{t('common.save')}</button>
     </form>
