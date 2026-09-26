@@ -487,6 +487,7 @@ function Masraflar({ t, plan, cat, items, repo, bump, cur }) {
   const [soru, setSoru] = useState(null);
   const [busy, setBusy] = useState(false);
   const [hata, setHata] = useState('');
+  const [duzenlenen, setDuzenlenen] = useState(null);
 
   const toplam = masraflar.reduce((s, i) => s + Number(i.amount), 0);
   const odenen = masraflar.filter((i) => i.is_done).reduce((s, i) => s + Number(i.amount), 0);
@@ -511,21 +512,29 @@ function Masraflar({ t, plan, cat, items, repo, bump, cur }) {
     <Card title={`💸 ${t('plans.costs')}`}
       action={masraflar.length ? <span className="faint">{t('plans.costSummary', formatMoney(odenen, cur), formatMoney(toplam, cur))}</span> : null}>
       {masraflar.map((i) => (
-        <Row key={i.id}
-          icon={<input type="checkbox" checked={i.is_done} aria-label={t('plans.paidNow')} style={{ width: 22, height: 22 }}
-            onChange={async () => { await repo.plans.updateItem(i.id, { is_done: !i.is_done }); bump(); }} />}
-          title={i.title}
-          sub={i.is_done ? `✓ ${t('plans.costPaid')}` : t('plans.costDue')}
-          end={<span className="inline" style={{ flexWrap: 'nowrap' }}>
-            <span className="money">{formatMoney(i.amount, i.currency || cur)}</span>
-            <button type="button" className={'btn btn--sm ' + (soru === i.id ? 'btn--danger' : 'btn--ghost')}
-              aria-label={t('common.delete')}
-              onClick={async () => {
-                if (soru !== i.id) { setSoru(i.id); return; }
-                setSoru(null); await repo.plans.removeItem(i.id); bump();
-              }}>{soru === i.id ? t('album.confirmDelete') : '✕'}</button>
-          </span>} />
+        duzenlenen === i.id
+          ? <MasrafDuzenle key={i.id} t={t} item={i} cur={cur} repo={repo} bump={bump} onDone={() => setDuzenlenen(null)} />
+          : (
+            <Row key={i.id}
+              onClick={() => { setSoru(null); setDuzenlenen(i.id); }}
+              icon={<input type="checkbox" checked={i.is_done} aria-label={t('plans.paidNow')} style={{ width: 22, height: 22 }}
+                onClick={(e) => e.stopPropagation()}
+                onChange={async () => { await repo.plans.updateItem(i.id, { is_done: !i.is_done }); bump(); }} />}
+              title={i.title}
+              sub={i.is_done ? `✓ ${t('plans.costPaid')}` : t('plans.costDue')}
+              end={<span className="inline" style={{ flexWrap: 'nowrap' }}>
+                <span className="money">{formatMoney(i.amount, i.currency || cur)}</span>
+                <button type="button" className={'btn btn--sm ' + (soru === i.id ? 'btn--danger' : 'btn--ghost')}
+                  aria-label={t('common.delete')}
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    if (soru !== i.id) { setSoru(i.id); return; }
+                    setSoru(null); await repo.plans.removeItem(i.id); bump();
+                  }}>{soru === i.id ? t('album.confirmDelete') : '✕'}</button>
+              </span>} />
+          )
       ))}
+      {masraflar.length > 0 && <div className="faint" style={{ fontSize: 'var(--fs-xs)', marginTop: 'var(--sp-1)' }}>{t('plans.costEditHint')}</div>}
       <form onSubmit={ekle} style={{ marginTop: 'var(--sp-2)' }}>
         <div className="grid-2">
           <input className="input" value={baslik} placeholder={t('plans.costHint')} aria-label={t('plans.costTitle')}
@@ -541,6 +550,46 @@ function Masraflar({ t, plan, cat, items, repo, bump, cur }) {
         <button className="btn btn--outline btn--block" disabled={busy}>+ {t('plans.addCost')}</button>
       </form>
     </Card>
+  );
+}
+
+/**
+ * Masrafı yerinde düzeltmek: ad ve tutar. Ödenmişse bağlı harcama da aynı
+ * anda güncellenir (0028 tetikleyicisi) — Bütçe ile plan birbirini yalanlamaz.
+ */
+function MasrafDuzenle({ t, item, cur, repo, bump, onDone }) {
+  const para = item.currency || cur;
+  const [baslik, setBaslik] = useState(item.title);
+  const [tutar, setTutar] = useState(String(Number(item.amount)));
+  const [busy, setBusy] = useState(false);
+  const [hata, setHata] = useState('');
+
+  const kaydet = async (e) => {
+    e.preventDefault(); setHata('');
+    const minor = parseAmount(tutar, para);
+    if (!baslik.trim() || !minor) return;
+    setBusy(true);
+    try {
+      await repo.plans.updateItem(item.id, { title: baslik.trim(), amount: minorToDecimal(minor, para) });
+      bump(); onDone();
+    } catch (ex) { setHata(ex.message); } finally { setBusy(false); }
+  };
+
+  return (
+    <form onSubmit={kaydet} className="masraf-duzen">
+      <div className="grid-2">
+        <input className="input" value={baslik} aria-label={t('plans.costTitle')} autoFocus
+          onChange={(e) => setBaslik(e.target.value)} />
+        <input className="input" inputMode="decimal" value={tutar} aria-label={t('money.amount')}
+          onChange={(e) => setTutar(e.target.value)} />
+      </div>
+      {item.is_done && <div className="faint" style={{ fontSize: 'var(--fs-xs)', margin: 'var(--sp-1) 0' }}>{t('plans.costSyncNote')}</div>}
+      {hata && <div className="banner" style={{ color: 'var(--color-danger)' }}>{hata}</div>}
+      <div className="grid-2" style={{ marginTop: 'var(--sp-2)' }}>
+        <button type="button" className="btn btn--ghost" onClick={onDone}>{t('common.cancel')}</button>
+        <button className="btn" disabled={busy}>{t('common.save')}</button>
+      </div>
+    </form>
   );
 }
 

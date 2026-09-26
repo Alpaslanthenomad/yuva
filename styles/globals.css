@@ -529,3 +529,6 @@ input[type="time"].input, input[type="date"].input {
   content: ''; position: fixed; top: 0; left: 0; right: 0; height: var(--safe-t);
   background: var(--color-bg); z-index: 30; pointer-events: none;
 }
+
+/* Plan masrafı yerinde düzenleme */
+.masraf-duzen { padding: var(--sp-3); margin: var(--sp-2) 0; background: var(--color-surface-2); border-radius: var(--radius-md); }

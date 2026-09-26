@@ -168,6 +168,14 @@ export default function MoneyPage() {
             <Card>
               {shown.map((x) => {
                 const c = categoryById(x.category_id);
+                // Eşin kişisel harcaması: yalnızca tarih, hesap, kimin ve tutar (0029).
+                if (x.masked) {
+                  return (
+                    <Row key={x.id} icon="🔒" title={t('money.personalMasked')}
+                      sub={`${fmtDay(x.occurred_on)} · ${accountById(x.account_id)?.name || ''} · 👤 ${memberById(x.for_member_id)?.display_name || ''}`}
+                      end={<div><Money amount={x.amount} currency={x.currency} kind={x.kind} />{x.currency !== baseCurrency && <div className="faint">≈ {formatMoney(x.amount_base, baseCurrency)}</div>}</div>} />
+                  );
+                }
                 return (
                   <Row key={x.id} icon={x.kind === 'transfer' ? '🔁' : c?.icon || '🏷️'} title={x.merchant || c?.name || t('money.' + x.kind)}
                     sub={`${fmtDay(x.occurred_on)} · ${accountById(x.account_id)?.name || ''}${x.for_member_id ? ` · 👤 ${memberById(x.for_member_id)?.display_name || t('money.personal')}` : ''}${x.plan_id ? ' · 🧭' : ''}`}
@@ -294,12 +302,14 @@ function BudgetsTab({ t, budget, period, baseCurrency, categories, repo, bump })
                   ? formatMoney(b.remaining, baseCurrency) + ' ' + t('money.left')
                   : formatMoney(-b.remaining, baseCurrency) + ' ' + t('money.over')}
                 {perDay !== null && ` · ${formatMoney(perDay, baseCurrency)} / ${t('today.perDay')}`}
+                {b.from_period && b.from_period < period && ` · ↻ ${t('money.carried')}`}
               </div>
               <div style={{ marginTop: 6 }}><Bar pct={b.pct} state={st.state} /></div>
             </Row>
           );
         })}
         {budget.length === 0 && <Empty>{t('money.noBudget')}</Empty>}
+        {budget.length > 0 && <div className="faint" style={{ marginTop: 'var(--sp-3)' }}>{t('money.budgetCarry')}</div>}
       </Card>
 
       <Card title={catId || amt ? t('money.editBudget') : `+ ${t('money.addBudget')}`}>
