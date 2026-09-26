@@ -4,7 +4,8 @@ import { useApp } from '../../components/AppShell.jsx';
 import { Card, Row, Chips, Empty, Sheet, Field, Avatar } from '../../components/ui.jsx';
 import { TaskForm, ShoppingForm, ExpenseForm } from '../../components/QuickAdd.jsx';
 import ShoppingPicker from '../../components/ShoppingPicker.jsx';
-import { useT } from '../../lib/i18n/context.jsx';
+import { useT, useLocale } from '../../lib/i18n/context.jsx';
+import { EXPENSE_PRESETS, presetName, presetCategoryId } from '../../lib/expenseCatalog.js';
 import { today, fmtDay, relativeLabel, weekDays, startOfWeek, nextOccurrence } from '../../lib/dates.js';
 
 const TABS = ['members', 'occasions', 'documents', 'tasks', 'shopping'];
@@ -18,6 +19,38 @@ function guessGroceryCategory(categories) {
   const re = /market|süpermarket|supermercado|gıda|alimento/i;
   return categories.find((c) => c.kind === 'expense' && re.test(c.name))?.id || '';
 }
+const MARKETLER = EXPENSE_PRESETS.filter((p) => p.group === 'market');
+const SON_MARKET = 'yuva.sonMarket';
+
+/**
+ * Alışverişi bitir: mağazaya dokun, tutarı yaz, kaydet. Harcama oluşur ve
+ * işaretli kalemler listeden düşer — ikisi tek işlemde (0016).
+ * Son seçilen mağaza hatırlanıyor; çoğu hane hep aynı markete gider.
+ */
+function AlisverisiBitir({ t, items, list, categories, onDone }) {
+  const { locale } = useLocale();
+  const [market, setMarket] = useState(() => {
+    try { return localStorage.getItem(SON_MARKET) || 'lider'; } catch { return 'lider'; }
+  });
+  const secili = MARKETLER.find((m) => m.key === market) || MARKETLER[0];
+  const sec = (k) => { setMarket(k); try { localStorage.setItem(SON_MARKET, k); } catch { /* */ } };
+  return (
+    <>
+      <div className="faint" style={{ marginBottom: 'var(--sp-3)' }}>
+        {items.map((i) => i.name).join(', ')}
+      </div>
+      <div className="field__label" style={{ marginBottom: 'var(--sp-2)' }}>{t('shopping.where')}</div>
+      <Chips value={market} onChange={sec}
+        options={MARKETLER.map((m) => ({ value: m.key, label: `${m.emoji} ${presetName(m, locale)}` }))} />
+      <div className="spacer" />
+      <ExpenseForm key={market}
+        checkoutListId={list.id}
+        preset={{ merchant: presetName(secili, locale), categoryId: presetCategoryId(secili, categories) || guessGroceryCategory(categories) }}
+        onDone={onDone} />
+    </>
+  );
+}
+
 const DOC_ICON = { passport: '🛂', id: '🪪', license: '🚗', visa: '🛃', insurance: '🛡️', contract: '📄', vehicle: '🔧', other: '📎' };
 
 export default function FamilyPage() {
@@ -28,10 +61,15 @@ export default function FamilyPage() {
   const [tab, setTab] = useState('members');
   useEffect(() => {
     try {
-      const s = new URLSearchParams(window.location.search).get('sekme');
+      const q = new URLSearchParams(window.location.search);
+      const s = q.get('sekme');
       if (s) setTab(s);
+      if (q.get('bitir')) setBitirAc(true);
     } catch { /* adres okunamazsa varsayılan sekme */ }
   }, []);
+  // Bugün ekranındaki "Alışverişi bitir" buraya ?bitir=1 ile geliyor:
+  // liste yüklenince sepetteki ilk liste için panel kendiliğinden açılsın.
+  const [bitirAc, setBitirAc] = useState(false);
   const [d, setD] = useState(null);
   const [sheet, setSheet] = useState(null);
   const [editing, setEditing] = useState(null);   // düzenlenen üye; null ise yeni kayıt
@@ -45,6 +83,12 @@ export default function FamilyPage() {
       repo.tasks.completions(startOfWeek(today()))])
       .then(([occasions, documents, tasks, lists, items, completions]) => setD({ occasions, documents, tasks, lists, items, completions }));
   }, [repo, household, tick]);
+  useEffect(() => {
+    if (!bitirAc || !d) return;
+    setBitirAc(false);
+    const l = d.lists.find((x) => d.items.some((i) => i.list_id === x.id && i.is_checked));
+    if (l) setToExpense({ list: l, items: d.items.filter((i) => i.list_id === l.id && i.is_checked) });
+  }, [bitirAc, d]);
 
   if (!d) return <Empty>{t('common.loading')}</Empty>;
   const T = today();
@@ -120,10 +164,29 @@ export default function FamilyPage() {
         <Card><Empty>{t('family.noList')}</Empty></Card>
       )}
       {tab === 'shopping' && d.lists.map((l) => {
-        const items = d.items.filter((i) => i.list_id === l.id);
+        // Alınanlar alta: markette kalan kalemler hep üstte dursun.
+        const items = d.items.filter((i) => i.list_id === l.id)
+          .sort((a, b) => Number(a.is_checked) - Number(b.is_checked));
         const checked = items.filter((i) => i.is_checked);
         return (
-          <Card key={l.id} title={`${l.icon} ${l.name}`} action={checked.length > 0 && <button className="btn btn--ghost btn--sm" onClick={async () => { await repo.shopping.clearChecked(l.id); bump(); }}>{t('family.clearChecked')}</button>}>
+          <Card key={l.id} title={`${l.icon} ${l.name}`}>
+            {/* ALIŞVERİŞİ BİTİR. Eskiden kartın en altında, hızlı seçimin de
+                altında soluk bir düğmeydi; kullanıcı yolu bulamıyordu. Sepette
+                kalem varken en üstte, belirgin duruyor. */}
+            {checked.length > 0 && (
+              <div className="bitir">
+                <div className="bitir__metin">
+                  <b>🛒 {t('shopping.inCart', checked.length)}</b>
+                  <span className="faint">{t('shopping.finishHint')}</span>
+                </div>
+                <button type="button" className="btn btn--block" onClick={() => setToExpense({ list: l, items: checked })}>
+                  🧾 {t('shopping.finish')}
+                </button>
+                <button type="button" className="btn btn--ghost btn--sm" onClick={async () => { await repo.shopping.clearChecked(l.id); bump(); }}>
+                  {t('shopping.clearOnly')}
+                </button>
+              </div>
+            )}
             {items.map((i) => (
               <Row key={i.id} icon={<input type="checkbox" checked={i.is_checked} onChange={async () => { await repo.shopping.toggleItem(i.id); bump(); }} style={{ width: 22, height: 22 }} />} title={i.name} done={i.is_checked} sub={memberById(i.added_by_member_id)?.display_name} />
             ))}
@@ -137,14 +200,6 @@ export default function FamilyPage() {
               🧺 {picker === l.id ? t('shopping.hide') : t('shopping.quickPick')}
             </button>
             {picker === l.id && <ShoppingPicker listId={l.id} items={items} />}
-            {checked.length > 0 && (
-              <>
-                <div className="spacer" />
-                <button className="btn btn--outline btn--block" onClick={() => setToExpense({ list: l, items: checked })}>
-                  🧾 {t('family.toExpense', checked.length)}
-                </button>
-              </>
-            )}
           </Card>
         );
       })}
@@ -156,13 +211,8 @@ export default function FamilyPage() {
         </Sheet>
       )}
       {toExpense && (
-        <Sheet onClose={() => setToExpense(null)} title={t('family.toExpense', toExpense.items.length)}>
-          <div className="faint" style={{ marginBottom: 'var(--sp-3)' }}>
-            {toExpense.items.map((i) => i.name).join(', ')}
-          </div>
-          <ExpenseForm
-            checkoutListId={toExpense.list.id}
-            preset={{ merchant: toExpense.list.name, categoryId: guessGroceryCategory(categories) }}
+        <Sheet onClose={() => setToExpense(null)} title={t('shopping.finishTitle', toExpense.items.length)}>
+          <AlisverisiBitir t={t} list={toExpense.list} items={toExpense.items} categories={categories}
             onDone={() => { setToExpense(null); bump(); }} />
         </Sheet>
       )}

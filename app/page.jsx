@@ -56,6 +56,8 @@ export default function TodayPage() {
   const bs = total ? budgetState(total.spent, total.budget) : null;
   const holidays = holidayMap(Number(T.slice(0, 4)), household.holiday_countries, locale);
   const openShopping = shopping.filter((s) => !s.is_checked);
+  // Markette işaretlenmiş ama henüz harcamaya çevrilmemiş kalemler.
+  const sepette = shopping.filter((s) => s.is_checked).length;
   // Listede zaten olanı "bitmiş olabilir" diye ayrıca söyleme.
   const listede = new Set(openShopping.map((x) => normalizeName(x.name)));
   const bittiAdlari = bitti
@@ -216,7 +218,7 @@ export default function TodayPage() {
           kalıyordu. Liste artık tek yerde, Aile ekranının alışveriş
           sekmesinde; burada yalnızca bekleyen olduğunu söyleyen bir satır
           duruyor ve dokununca oraya gidiyor. */}
-      {(openShopping.length > 0 || bittiAdlari.length > 0) && (
+      {(openShopping.length > 0 || bittiAdlari.length > 0 || sepette > 0) && (
         <Card className="card--flat">
           <Row icon="🛒" title={openShopping.length > 0 ? t('today.shopping') : t('shopping.restockTitle')}
             sub={[
@@ -225,6 +227,12 @@ export default function TodayPage() {
             ].filter(Boolean).join(' · ')}
             end={<span className="faint">→</span>}
             onClick={() => { window.location.href = '/aile/?sekme=shopping'; }} />
+          {sepette > 0 && (
+            <button type="button" className="btn btn--block" style={{ marginTop: 'var(--sp-2)' }}
+              onClick={() => { window.location.href = '/aile/?sekme=shopping&bitir=1'; }}>
+              🧾 {t('shopping.finishN', sepette)}
+            </button>
+          )}
         </Card>
       )}
     </>

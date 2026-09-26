@@ -532,3 +532,13 @@ input[type="time"].input, input[type="date"].input {
 
 /* Plan masrafı yerinde düzenleme */
 .masraf-duzen { padding: var(--sp-3); margin: var(--sp-2) 0; background: var(--color-surface-2); border-radius: var(--radius-md); }
+
+/* Alışverişi bitir: sepette kalem varken liste kartının en üstünde */
+.bitir {
+  display: flex; flex-direction: column; gap: var(--sp-2); align-items: stretch;
+  padding: var(--sp-3); margin-bottom: var(--sp-3); border-radius: var(--radius-md);
+  background: var(--color-brand-soft); color: var(--color-brand-ink);
+}
+.bitir__metin { display: flex; flex-direction: column; gap: 2px; }
+.bitir__metin .faint { color: var(--color-brand-ink); opacity: .8; font-size: var(--fs-sm); }
+.bitir .btn--ghost { color: var(--color-brand-ink); background: transparent; align-self: center; }
