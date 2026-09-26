@@ -91,3 +91,29 @@ test('plan silinebiliyor; ödenmiş masraflar Bütçe’de kalır', async () => 
   const hepsi = await repo.transactions.list({});
   assert.equal(hepsi.some((t) => t.merchant === 'Kort' && t.amount === 10000), true);
 });
+
+// ---- Hediye planı (0032) ---------------------------------------------------
+import { hediyeUygun, hediyeLinki, hediyePlani, HEDIYE_LISTESI } from '../lib/planCatalog.js';
+
+test('hediye: doğum günü ve yıldönümü uygun, anma ve özel gün değil', () => {
+  assert.equal(hediyeUygun({ kind: 'birthday' }), true);
+  assert.equal(hediyeUygun({ kind: 'anniversary' }), true);
+  assert.equal(hediyeUygun({ kind: 'memorial' }), false);
+  assert.equal(hediyeUygun({ kind: 'custom' }), false);
+});
+
+test('hediye: bağlantı ve o yılın planı eşleşmesi', () => {
+  const o = { id: 'o1', kind: 'birthday', date: '2026-10-09' };
+  assert.equal(hediyeLinki(o), '/planlar/?hediye=o1&d=2026-10-09');
+  assert.equal(hediyePlani([{ occasion_id: 'o1', starts_on: '2025-10-09' }], o), null, 'geçen yılın planı sayılmaz');
+  assert.ok(hediyePlani([{ occasion_id: 'o1', starts_on: '2026-10-09' }], o));
+  assert.ok(HEDIYE_LISTESI.every(([tr, es]) => tr && es));
+});
+
+test('hediye planı demo deposunda önemli güne bağlı kaydediliyor', async () => {
+  const repo = makeDemoRepo(); repo.reset('tr');
+  const [o] = await repo.occasions.list();
+  const p = await repo.plans.create({ title: 'x', kind: 'gathering', category: 'celebration', starts_on: o.date, occasion_id: o.id });
+  assert.ok(hediyePlani(await repo.plans.list(), o));
+  assert.equal(p.occasion_id, o.id);
+});

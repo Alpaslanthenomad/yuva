@@ -85,3 +85,11 @@ test('haftalık özet (0030): zamanlayıcıya bağlı, iç fonksiyon API’ye ka
   const ui = readFileSync(new URL('../components/BildirimAyarlari.jsx', import.meta.url), 'utf8');
   assert.match(ui, /k="weekly"/);
 });
+
+test('hediye hatırlatması (0032): zamanlayıcıya bağlı, kendi gününe gitmez, tercihle kapanır', () => {
+  const sql = readFileSync(new URL('../supabase/migrations/0032_dogum_gunu_hediye.sql', import.meta.url), 'utf8');
+  assert.match(sql, /perform public\.push_schedule_occasions\(now\(\)\)/);
+  assert.match(sql, /continue when o\.member_id is not distinct from m\.id/);
+  assert.match(sql, /coalesce\(p\.occasions, true\)/);
+  assert.match(sql, /occasions\s+= coalesce\(\(p->>'occasions'\)::boolean, occasions\)/);
+});

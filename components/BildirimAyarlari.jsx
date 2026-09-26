@@ -151,6 +151,7 @@ export default function BildirimAyarlari({ kompakt = false }) {
             <input className="input" type="time" style={{ width: 110 }} value={String(prefs.goals_at || '20:30').slice(0, 5)}
               disabled={!prefs.goals} onChange={(e) => e.target.value && yaz({ goals_at: e.target.value })} />
           </Anahtar>
+          <Anahtar k="occasions" label={t('notify.occasions')} />
           <Anahtar k="digest" label={t('notify.digest')} />
           <Anahtar k="weekly" label={t('notify.weekly')}>
             <select className="select" style={{ width: 110 }} value={String(prefs.weekly_at || '19:00').slice(0, 5)}

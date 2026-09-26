@@ -4,7 +4,7 @@ import { useApp } from '../../components/AppShell.jsx';
 import { Card, Row, Bar, Chips, Empty, Sheet, Field } from '../../components/ui.jsx';
 import { ExpenseForm, TaskForm } from '../../components/QuickAdd.jsx';
 import { useT, useLocale } from '../../lib/i18n/context.jsx';
-import { PLAN_GROUPS, PLAN_CATEGORIES, PLAN_COST_CATEGORY, planCategory, categoryName, categoryHint, categoryList, groupName, planSection } from '../../lib/planCatalog.js';
+import { PLAN_GROUPS, PLAN_CATEGORIES, PLAN_COST_CATEGORY, planCategory, categoryName, categoryHint, categoryList, groupName, planSection, HEDIYE_LISTESI } from '../../lib/planCatalog.js';
 import { presetCategoryId } from '../../lib/expenseCatalog.js';
 import { today, daysBetween, fmtDay, fmtDayLong } from '../../lib/dates.js';
 import { formatMoney, budgetState, parseAmount, minorToDecimal, planTotals, CURRENCY_CODES } from '../../lib/money.js';
@@ -45,6 +45,24 @@ export default function PlansPage() {
   const [gecmisAcik, setGecmisAcik] = useState(false);
 
   useEffect(() => { if (household) repo.plans.list().then(setPlans); }, [repo, household, tick]);
+
+  // Hediye hatırlatmasından gelindi (/planlar/?hediye=<önemli gün>&d=<tarih>):
+  // hazır doldurulmuş hediye planı açılır (0032).
+  const [hediye, setHediye] = useState(null);
+  useEffect(() => {
+    if (!household) return;
+    let q; try { q = new URLSearchParams(window.location.search); } catch { return; }
+    const id = q.get('hediye'); const d = q.get('d');
+    if (!id) return;
+    repo.occasions.list().then((list) => {
+      const o = (list || []).find((x) => x.id === id);
+      if (o) setHediye({ o, d: d || o.date });
+    }).catch(() => {});
+  }, [repo, household]);
+  const hediyeKapat = () => {
+    setHediye(null);
+    try { window.history.replaceState(null, '', window.location.pathname); } catch { /* */ }
+  };
   if (!plans) return <Empty>{t('common.loading')}</Empty>;
 
   const T = today();
@@ -99,6 +117,16 @@ export default function PlansPage() {
       {creating && (
         <Sheet onClose={() => setCreating(null)} title={t('plans.newPlan')}>
           <PlanForm t={t} categoryKey={creating} onDone={() => setCreating(null)} />
+        </Sheet>
+      )}
+      {hediye && (
+        <Sheet onClose={hediyeKapat} title={`🎁 ${t('plans.giftPlan')}`}>
+          <PlanForm t={t} categoryKey="celebration" onDone={hediyeKapat}
+            preset={{
+              title: t('plans.giftTitle', hediye.o.title), starts_on: hediye.d,
+              description: hediye.o.gift_ideas ? `${t('plans.giftIdea')}: ${hediye.o.gift_ideas}` : '',
+              occasion_id: hediye.o.id, list: HEDIYE_LISTESI,
+            }} />
         </Sheet>
       )}
     </>
@@ -279,19 +307,19 @@ function PlanDetail({ t, locale, plan, onClose, repo, tick, bump, baseCurrency, 
  * düzenlemede kategori değiştirilmez (davranış — hedef/katkı, bant — ona bağlı).
  * "Harcaması olacak" kutusu kapalıysa bütçe alanı hiç görünmez.
  */
-function PlanForm({ t, onDone, plan, categoryKey }) {
+function PlanForm({ t, onDone, plan, categoryKey, preset }) {
   const { repo, bump, baseCurrency } = useApp();
   const { locale } = useLocale();
   const editing = Boolean(plan);
   const [catKey, setCatKey] = useState(plan ? planCategory(plan).key : (categoryKey || 'visit'));
   const cat = planCategory(catKey);
   const isGoal = cat.kind === 'goal';
-  const [title, setTitle] = useState(plan?.title || '');
+  const [title, setTitle] = useState(plan?.title || preset?.title || '');
   const [dest, setDest] = useState(plan?.destination || '');
-  const [s, setS] = useState(plan?.starts_on || '');
+  const [s, setS] = useState(plan?.starts_on || preset?.starts_on || '');
   const [time, setTime] = useState(plan?.start_time ? String(plan.start_time).slice(0, 5) : '');
   const [e, setE] = useState(plan?.ends_on && plan.ends_on !== plan.starts_on ? plan.ends_on : '');
-  const [notes, setNotes] = useState(plan?.description || '');
+  const [notes, setNotes] = useState(plan?.description || preset?.description || '');
   const [status, setStatus] = useState(plan?.status || 'planned');
   const [money, setMoney] = useState(plan ? plan.has_money !== false : cat.money);
   const [liste, setListe] = useState(true);
@@ -302,6 +330,8 @@ function PlanForm({ t, onDone, plan, categoryKey }) {
 
   // Kategori değişince para varsayılanı da değişsin (kullanıcı henüz dokunmadıysa).
   const kategoriSec = (k) => { setCatKey(k); setMoney(planCategory(k).money); };
+  // Hediye planında kutlama listesi (pasta, süsleme…) değil, hediyenin kendi listesi.
+  const hazirListe = preset?.list ? categoryList({ list: preset.list }, locale) : categoryList(cat, locale);
 
   const submit = async (ev) => {
     ev.preventDefault(); if (!title.trim() || busy) return;
@@ -328,9 +358,13 @@ function PlanForm({ t, onDone, plan, categoryKey }) {
           ...(turDegisti ? { category: cat.key, kind: cat.kind, icon: cat.emoji } : {}),
         });
       } else {
-        const yeni = await repo.plans.create({ ...row, kind: cat.kind, category: cat.key, icon: cat.emoji });
+        const yeni = await repo.plans.create({
+          ...row, kind: cat.kind, category: cat.key, icon: preset?.occasion_id ? '🎁' : cat.emoji,
+          ...(preset?.occasion_id ? { occasion_id: preset.occasion_id } : {}),
+        });
         if (liste && yeni?.id) {
-          for (const [i, baslik] of categoryList(cat, locale).entries()) {
+          const hazir = hazirListe;
+          for (const [i, baslik] of hazir.entries()) {
             await repo.plans.addItem({ plan_id: yeni.id, kind: 'checklist', title: baslik, sort_order: i });
           }
         }
@@ -379,10 +413,10 @@ function PlanForm({ t, onDone, plan, categoryKey }) {
           <Field label={t('money.currency')}><select className="select" value={cur} onChange={(x) => setCur(x.target.value)}>{CURRENCY_CODES.map((c) => <option key={c}>{c}</option>)}</select></Field>
         </div>
       )}
-      {!editing && categoryList(cat, locale).length > 0 && (
+      {!editing && hazirListe.length > 0 && (
         <label className="inline" style={{ marginBottom: 'var(--sp-3)', alignItems: 'flex-start' }}>
           <input type="checkbox" checked={liste} onChange={(x) => setListe(x.target.checked)} style={{ width: 22, height: 22 }} />
-          <span>{t('plans.addList')}<br /><span className="faint">{categoryList(cat, locale).join(' · ')}</span></span>
+          <span>{t('plans.addList')}<br /><span className="faint">{hazirListe.join(' · ')}</span></span>
         </label>
       )}
       {editing && (

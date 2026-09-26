@@ -4,6 +4,7 @@ import { useApp } from '../../components/AppShell.jsx';
 import { Card, Row, Chips, Empty, Sheet, Field, Avatar } from '../../components/ui.jsx';
 import { TaskForm, ShoppingForm, ExpenseForm } from '../../components/QuickAdd.jsx';
 import ShoppingPicker from '../../components/ShoppingPicker.jsx';
+import HediyeDugmesi from '../../components/HediyeDugmesi.jsx';
 import { useT, useLocale } from '../../lib/i18n/context.jsx';
 import { EXPENSE_PRESETS, presetName, presetCategoryId } from '../../lib/expenseCatalog.js';
 import { today, fmtDay, relativeLabel, weekDays, startOfWeek, nextOccurrence } from '../../lib/dates.js';
@@ -80,8 +81,8 @@ export default function FamilyPage() {
   useEffect(() => {
     if (!household) return;
     Promise.all([repo.occasions.list(), repo.documents.list(), repo.tasks.list(), repo.shopping.lists(), repo.shopping.items(),
-      repo.tasks.completions(startOfWeek(today()))])
-      .then(([occasions, documents, tasks, lists, items, completions]) => setD({ occasions, documents, tasks, lists, items, completions }));
+      repo.tasks.completions(startOfWeek(today())), repo.plans.list()])
+      .then(([occasions, documents, tasks, lists, items, completions, plans]) => setD({ occasions, documents, tasks, lists, items, completions, plans }));
   }, [repo, household, tick]);
   useEffect(() => {
     if (!bitirAc || !d) return;
@@ -128,7 +129,11 @@ export default function FamilyPage() {
             {d.occasions.map((o) => (
               <Row key={o.id} icon={o.kind === 'birthday' ? '🎂' : o.kind === 'anniversary' ? '💍' : o.kind === 'memorial' ? '🕯️' : '📌'} title={o.title}
                 sub={`${fmtDay(o.date)} · ${relativeLabel(o.date)}${o.year && o.kind === 'birthday' ? ' · ' + t('family.turns', Number(o.date.slice(0, 4)) - o.year) : ''}${o.gift_ideas ? ' · 🎁 ' + o.gift_ideas : ''}`}
-                end={<span className={'tag' + (o.daysLeft <= o.remind_days ? ' tag--warn' : '')}>{t('family.daysShort', o.daysLeft)}</span>} />
+                end={<span className={'tag' + (o.daysLeft <= o.remind_days ? ' tag--warn' : '')}>{t('family.daysShort', o.daysLeft)}</span>}>
+                {o.daysLeft <= Math.max(o.remind_days || 7, 14) && (
+                  <div style={{ marginTop: 'var(--sp-2)' }}><HediyeDugmesi o={o} plans={d.plans} me={me} t={t} /></div>
+                )}
+              </Row>
             ))}
             {d.occasions.length === 0 && <Empty>{t('common.empty')}</Empty>}
           </Card>

@@ -11,6 +11,8 @@ import { holidayMap } from '../lib/holidays.js';
 import GununKaresi from '../components/GununKaresi.jsx';
 import BildirimAyarlari from '../components/BildirimAyarlari.jsx';
 import Yenilikler from '../components/Yenilikler.jsx';
+import HediyeDugmesi from '../components/HediyeDugmesi.jsx';
+import { hediyeUygun } from '../lib/planCatalog.js';
 import { selamAnahtari } from '../lib/album.js';
 import { SHOPPING_CATALOG, catalogName, normalizeName } from '../lib/shoppingCatalog.js';
 
@@ -175,7 +177,10 @@ export default function TodayPage() {
           <Row key={e.id + e.date} icon="📅" title={e.title} sub={`${relativeLabel(e.date)} · ${e.all_day ? t('calendar.allDay') : fmtTime(e.starts_at)}`} end={<Avatars members={(e.attendees || []).map(memberById).filter(Boolean)} />} />
         ))}
         {agenda.occasions.map((o) => (
-          <Row key={o.id} icon={o.kind === 'birthday' ? '🎂' : '💍'} title={o.title} sub={relativeLabel(o.date) + (o.year && o.kind === 'birthday' ? ` · ${t('family.turns', Number(o.date.slice(0, 4)) - o.year)}` : '')} end={o.gift_ideas ? <span className="tag">🎁</span> : null} />
+          <Row key={o.id} icon={o.kind === 'birthday' ? '🎂' : '💍'} title={o.title} sub={relativeLabel(o.date) + (o.year && o.kind === 'birthday' ? ` · ${t('family.turns', Number(o.date.slice(0, 4)) - o.year)}` : '')}
+            end={o.gift_ideas && !hediyeUygun(o) ? <span className="tag">🎁</span> : null}>
+            {hediyeUygun(o) && <div style={{ marginTop: 'var(--sp-2)' }}><HediyeDugmesi o={o} plans={plans} me={me} t={t} /></div>}
+          </Row>
         ))}
       </Card>
 
