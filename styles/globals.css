@@ -586,3 +586,6 @@ input[type="time"].input, input[type="date"].input {
 /* Kategorisiz harcamalar kartı */
 .kategorisiz { border: 1px solid var(--color-accent); }
 .kategorisiz__baslik { width: 100%; display: flex; justify-content: space-between; align-items: center; background: none; color: inherit; text-align: left; padding: 0; }
+
+/* Limit: ay sonu tahmini */
+.tahmin { margin-top: 4px; font-size: var(--fs-xs); color: var(--color-warn); font-weight: 600; }

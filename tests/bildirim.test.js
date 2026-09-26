@@ -106,3 +106,12 @@ test('otomatik katkı ve ay sonu özeti (0034): zamanlayıcıya bağlı, API’y
   assert.match(sql, /toplam >= g\.target_amount/);
   assert.match(sql, /g\.auto_last >= hedef_gun/);
 });
+
+test('anlık limit uyarısı (0036): yalnızca eşik bu harcamayla geçilince, ayda bir kez', () => {
+  const sql = readFileSync(new URL('../supabase/migrations/0036_limit_uyarisi.sql', import.meta.url), 'utf8');
+  assert.match(sql, /after insert on public\.transactions/);
+  assert.match(sql, /once < 0\.8 \* lim\.amount_base and harcanan >= 0\.8 \* lim\.amount_base/);
+  assert.match(sql, /'bw:' \|\| coalesce\(lim\.category_id::text, 'toplam'\) \|\| ':' \|\| per \|\| ':' \|\| esik/);
+  // Kişisel limit uyarısı yalnızca sahibine.
+  assert.match(sql, /perform public\.push_enqueue\(new\.for_member_id,/);
+});

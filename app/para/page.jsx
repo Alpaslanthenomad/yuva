@@ -260,6 +260,25 @@ export default function MoneyPage() {
 function BudgetsTab({ t, budget, period, baseCurrency, categories, repo, bump }) {
   const [catId, setCatId] = useState('');
   const [amt, setAmt] = useState('');
+  // LİMİT ÖNERİSİ (öneri 7): son 3 tam ayın ortalaması, kategori başına.
+  // Rakam uydurmak yerine gerçek harcamadan başlanır.
+  const [ortalama, setOrtalama] = useState({});
+  useEffect(() => {
+    let iptal = false;
+    const onceki = addMonths(period + '-01', -1).slice(0, 7);
+    repo.summary.trend(onceki, 3, 'family').then((tr) => {
+      if (iptal || !tr) return;
+      const aylar = (tr.months || []).map((m) => m.period);
+      const n = Math.max(aylar.length, 1);
+      const o = { '': (tr.months || []).reduce((s, m) => s + Number(m.expense || 0), 0) / n };
+      for (const c of tr.categories || []) {
+        o[c.category_id] = aylar.reduce((s, p) => s + Number(c.by_month?.[p] || 0), 0) / n;
+      }
+      setOrtalama(o);
+    }).catch(() => {});
+    return () => { iptal = true; };
+  }, [repo, period]);
+  const yuvarla = (x) => (baseCurrency === 'CLP' ? Math.ceil(x / 5000) * 5000 : Math.ceil(x / 10) * 10);
   const [removing, setRemoving] = useState(null);   // silinmeyi bekleyen zarf
   const parents = categories.filter((c) => c.kind === 'expense' && !c.parent_id);
 
@@ -277,6 +296,10 @@ function BudgetsTab({ t, budget, period, baseCurrency, categories, repo, bump })
     setRemoving(null);
   };
 
+  // AY SONU TAHMİNİ (öneri 6): bu ayın harcama hızıyla ay sonunda nereye varılır.
+  const gunNo = Number(today().slice(8, 10));
+  const aydakiGun = new Date(Number(period.slice(0, 4)), Number(period.slice(5, 7)), 0).getDate();
+  const tahmin = (b) => (gunNo >= 5 && b.spent > 0 ? (b.spent / gunNo) * aydakiGun : null);
   const over = budget.filter((b) => budgetState(b.spent, b.budget).state === 'over');
   const warn = budget.filter((b) => budgetState(b.spent, b.budget).state === 'warn');
   const isThisMonth = period === periodOf(today());
@@ -309,6 +332,9 @@ function BudgetsTab({ t, budget, period, baseCurrency, categories, repo, bump })
                 {perDay !== null && ` · ${formatMoney(perDay, baseCurrency)} / ${t('today.perDay')}`}
                 {b.from_period && b.from_period < period && ` · ↻ ${t('money.carried')}`}
               </div>
+              {isThisMonth && st.state !== 'over' && tahmin(b) > b.budget * 1.02 && (
+                <div className="tahmin">📈 {t('money.pace', formatMoney(tahmin(b), baseCurrency))}</div>
+              )}
               <div style={{ marginTop: 6 }}><Bar pct={b.pct} state={st.state} /></div>
             </Row>
           );
@@ -328,6 +354,12 @@ function BudgetsTab({ t, budget, period, baseCurrency, categories, repo, bump })
           <Field label={`${t('money.amount')} (${baseCurrency})`}><input className="input" inputMode="decimal" value={amt} onChange={(e) => setAmt(e.target.value)} /></Field>
           <button className="btn" style={{ marginBottom: 'var(--sp-4)' }}>{t('common.save')}</button>
         </form>
+        {!amt && ortalama[catId || ''] > 0 && (
+          <button type="button" className="btn btn--ghost btn--sm" style={{ marginBottom: 'var(--sp-2)' }}
+            onClick={() => setAmt(String(yuvarla(ortalama[catId || ''])))}>
+            💡 {t('money.avgSuggest', formatMoney(yuvarla(ortalama[catId || '']), baseCurrency))}
+          </button>
+        )}
         {budget.some((b) => (b.category_id || '') === catId) && (
           removing === catId ? (
             <div className="grid-2">
