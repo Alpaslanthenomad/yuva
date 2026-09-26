@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import DuzenliOdemeler from '../../components/DuzenliOdemeler.jsx';
+import Kategorisizler from '../../components/Kategorisizler.jsx';
 import { useApp } from '../../components/AppShell.jsx';
 import { Card, Row, Money, Bar, Chips, Seg, Empty, Sheet, Field } from '../../components/ui.jsx';
 import { ExpenseForm } from '../../components/QuickAdd.jsx';
@@ -94,6 +95,7 @@ export default function MoneyPage() {
           3) Benim kişisel harcamam ve limitim.
           Üye dağılımı ve sabit/değişken kutuları kaldırıldı: harcamalar aile
           için yapılıyor; kişi ayrımını artık kişisel işareti taşıyor. */}
+      {tab === 'overview' && <Kategorisizler txns={txns} />}
       {tab === 'overview' && (
         <>
           <Card className="butce-ozet">

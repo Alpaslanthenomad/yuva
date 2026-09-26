@@ -577,3 +577,12 @@ input[type="time"].input, input[type="date"].input {
 /* Birikim hedefi: otomatik aylık katkı */
 .oto-katki { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); padding: var(--sp-3); border-radius: var(--radius-md); background: var(--color-surface-2); }
 .oto-katki--form { flex-direction: column; align-items: stretch; }
+
+/* Tek satırda harcama ("jumbo 45990") */
+.hizli { margin-bottom: var(--sp-3); }
+.hizli__input { background: var(--color-surface-2); border-style: dashed; }
+.hizli__onizleme { margin-top: var(--sp-2); font-size: var(--fs-sm); display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+
+/* Kategorisiz harcamalar kartı */
+.kategorisiz { border: 1px solid var(--color-accent); }
+.kategorisiz__baslik { width: 100%; display: flex; justify-content: space-between; align-items: center; background: none; color: inherit; text-align: left; padding: 0; }

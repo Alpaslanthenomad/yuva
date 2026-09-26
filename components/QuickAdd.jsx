@@ -1,13 +1,14 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useApp } from './AppShell.jsx';
 import ShoppingPicker from './ShoppingPicker.jsx';
 import FisAlani from './FisAlani.jsx';
+import { hizliCoz, magazaBul } from '../lib/hizliGiris.js';
 import { Sheet, Field } from './ui.jsx';
 import { useT, useLocale } from '../lib/i18n/context.jsx';
 import { parseAmount, minorToDecimal, formatMoney, CURRENCY_CODES, CURRENCIES } from '../lib/money.js';
 import { today, buildRRule, freqKeyOf } from '../lib/dates.js';
-import { EXPENSE_PRESETS, presetName, presetCategoryId } from '../lib/expenseCatalog.js';
+import { EXPENSE_PRESETS, presetName, presetCategoryId, katalogdanBul } from '../lib/expenseCatalog.js';
 
 const TABS = [
   { key: 'expense', icon: '💸' }, { key: 'event', icon: '📅' }, { key: 'task', icon: '✅' }, { key: 'shopping', icon: '🛒' },
@@ -114,6 +115,53 @@ export function ExpenseForm({ onDone, planId, txn, preset, checkoutListId }) {
     return () => { iptal = true; };
   }, [repo, editing, checkoutListId]);
 
+  // MAĞAZADAN KATEGORİ ÖĞRENME (0035). "Jumbo" yazınca kategori, geçmişte
+  // en sık kullanılanla dolar — kullanıcı kategoriyi kendisi seçmediyse.
+  const [ogrenilen, setOgrenilen] = useState([]);
+  const [katElle, setKatElle] = useState(Boolean(txn?.category_id));
+  const [ogrenildi, setOgrenildi] = useState(null);
+  useEffect(() => {
+    if (!repo.suggest?.merchants) return undefined;
+    let iptal = false;
+    repo.suggest.merchants().then((r) => { if (!iptal) setOgrenilen(Array.isArray(r) ? r : []); }).catch(() => {});
+    return () => { iptal = true; };
+  }, [repo]);
+  useEffect(() => {
+    if (katElle || kind !== 'expense') { setOgrenildi(null); return; }
+    const m = magazaBul(ogrenilen, merchant);
+    if (m && categories.some((c) => c.id === m.category_id)) { setCategoryId(m.category_id); setOgrenildi(m); return; }
+    // Hiç girilmemiş ama tanınan bir yer (Copec → Yakıt, Uber → Taksi).
+    const kat = katalogdanBul(merchant);
+    const kid = kat && presetCategoryId(kat, categories);
+    if (kid) { setCategoryId(kid); setOgrenildi({ merchant, category_id: kid }); } else setOgrenildi(null);
+  }, [merchant, ogrenilen, katElle, kind, categories]);
+
+  // TEK SATIRDA GİRİŞ: "jumbo 45990" + Enter. Kategori öğrenilmişse hemen
+  // kaydeder; değilse alanları doldurup kategori seçimine bırakır.
+  const formRef = useRef(null);
+  const [hizliMetin, setHizliMetin] = useState('');
+  const [hizliKaydet, setHizliKaydet] = useState(false);
+  const hizli = hizliMetin.trim() ? hizliCoz(hizliMetin) : null;
+  const hizliMagaza = hizli?.merchant ? magazaBul(ogrenilen, hizli.merchant) : null;
+  const hizliKatalog = !hizliMagaza && hizli?.merchant ? katalogdanBul(hizli.merchant) : null;
+  const hizliKategori = (hizliMagaza && categories.find((c) => c.id === hizliMagaza.category_id))
+    || (hizliKatalog && categories.find((c) => c.id === presetCategoryId(hizliKatalog, categories))) || null;
+  const hizliUygula = () => {
+    if (!hizli || !hizli.amount) return;
+    const ad = hizliMagaza?.merchant || (hizliKatalog && presetName(hizliKatalog, locale))
+      || hizli.merchant.replace(/(^|\s)\S/g, (x) => x.toUpperCase());
+    setAmount(String(hizli.amount)); setMerchant(ad); setSeciliOneri(-1);
+    if (hizliKategori) { setCategoryId(hizliKategori.id); setKatElle(true); }
+    setForMember(hizli.personal ? (me?.id || '') : '');
+    setHizliMetin('');
+    if (hizliKategori) setHizliKaydet(true);
+  };
+  useEffect(() => {
+    if (!hizliKaydet) return;
+    setHizliKaydet(false);
+    formRef.current?.requestSubmit();
+  }, [hizliKaydet]);
+
   const oneriSec = (o, i) => {
     if (seciliOneri === i) {
       setSeciliOneri(-1); setAmount(''); setMerchant(''); setCategoryId(''); setHizliKat('');
@@ -122,7 +170,7 @@ export function ExpenseForm({ onDone, planId, txn, preset, checkoutListId }) {
     setSeciliOneri(i);
     setAmount(String(o.amount));
     setMerchant(o.merchant || '');
-    setCategoryId(o.category_id || '');
+    setCategoryId(o.category_id || ''); setKatElle(Boolean(o.category_id));
     setHizliKat(''); setQuick('');
     if (o.account_id && accounts.some((a) => a.id === o.account_id)) setAccountId(o.account_id);
     if (o.currency) setCurrency(o.currency);
@@ -132,7 +180,7 @@ export function ExpenseForm({ onDone, planId, txn, preset, checkoutListId }) {
     if (quick === pr.key) { setQuick(''); setMerchant(''); setCategoryId(''); return; }
     setQuick(pr.key);
     setMerchant(presetName(pr, locale));
-    setCategoryId(presetCategoryId(pr, categories));
+    setCategoryId(presetCategoryId(pr, categories)); setKatElle(true);
   };
   // Düzelt'e basıldıysa aynı form, bu kez o işlemin düzenleme kipinde.
   if (kaydedilen && duzeltmeAcik) {
@@ -170,7 +218,7 @@ export function ExpenseForm({ onDone, planId, txn, preset, checkoutListId }) {
   /** Kategoriye dokununca kategori dolar; ikinci dokunuş seçimi kaldırır. */
   const pickKat = (c) => {
     if (hizliKat === c.id) { setHizliKat(''); setCategoryId(''); setQuick(''); setMerchant(''); return; }
-    setHizliKat(c.id); setCategoryId(c.id); setQuick(''); setMerchant('');
+    setHizliKat(c.id); setCategoryId(c.id); setQuick(''); setMerchant(''); setKatElle(true);
   };
 
   // Seçili kategorinin (ve alt kategorilerinin) hazır yerleri. Market'e
@@ -230,7 +278,26 @@ export function ExpenseForm({ onDone, planId, txn, preset, checkoutListId }) {
   };
 
   return (
-    <form onSubmit={submit}>
+    <form onSubmit={submit} ref={formRef}>
+      {!editing && !checkoutListId && kind === 'expense' && (
+        <div className="hizli">
+          <input className="input hizli__input" value={hizliMetin} enterKeyHint="done"
+            placeholder={t('money.quickLine')} aria-label={t('money.quickLine')}
+            onChange={(e) => setHizliMetin(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); hizliUygula(); } }} />
+          {hizli && (
+            <div className="hizli__onizleme">
+              {hizli.amount
+                ? <>→ <b>{hizliMagaza?.merchant || hizli.merchant || '—'}</b> · {formatMoney(hizli.amount, currency)}
+                    {hizliKategori ? ` · ${hizliKategori.icon || ''} ${hizliKategori.name}` : ''}{hizli.personal ? ` · 👤 ${t('money.personal')}` : ''}
+                    <button type="button" className="btn btn--sm" style={{ marginLeft: 'var(--sp-2)' }} onClick={hizliUygula}>
+                      {hizliKategori ? t('money.quickSave') : t('money.quickFill')}
+                    </button></>
+                : <span className="faint">{t('money.quickNeedAmount')}</span>}
+            </div>
+          )}
+        </div>
+      )}
       <div className="seg" style={{ display: 'flex', marginBottom: 'var(--sp-3)' }}>
         {['expense', 'income', 'transfer'].map((k) => (
           <button type="button" key={k} className={'seg__btn' + (kind === k ? ' seg__btn--active' : '')} style={{ flex: 1 }} onClick={() => setKind(k)}>{t('money.' + k)}</button>
@@ -310,7 +377,7 @@ export function ExpenseForm({ onDone, planId, txn, preset, checkoutListId }) {
           </Field>
         ) : (
           <Field label={t('money.category')}>
-            <select className="select" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+            <select className="select" value={categoryId} onChange={(e) => { setCategoryId(e.target.value); setKatElle(Boolean(e.target.value)); }}>
               <option value="">—</option>
               {parents.map((p) => {
                 const kids = childrenOf(p.id);
@@ -326,7 +393,11 @@ export function ExpenseForm({ onDone, planId, txn, preset, checkoutListId }) {
         )}
       </div>
       <Field label={t('money.merchant')}>
-        <input className="input" value={merchant} onChange={(e) => setMerchant(e.target.value)} placeholder={t('money.merchantHint')} />
+        <input className="input" value={merchant} list="yuva-magazalar" onChange={(e) => setMerchant(e.target.value)} placeholder={t('money.merchantHint')} />
+        <datalist id="yuva-magazalar">
+          {ogrenilen.slice(0, 60).map((m) => <option key={m.merchant} value={m.merchant} />)}
+        </datalist>
+        {ogrenildi && <span className="faint">🧠 {t('money.learned', categories.find((c) => c.id === ogrenildi.category_id)?.name || '')}</span>}
       </Field>
       <Field label={t('money.date')}>
         <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
