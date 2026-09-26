@@ -57,6 +57,21 @@ export default function MyDayPage() {
 
   useEffect(() => { yukle(); }, [yukle, tick]);
 
+  // "Takviye aldım" kısayolu (/gunum/?takviye=1): takviye kartına kaydır.
+  const [takviyeyeGit, setTakviyeyeGit] = useState(false);
+  useEffect(() => {
+    try { if (new URLSearchParams(window.location.search).get('takviye')) setTakviyeyeGit(true); } catch { /* */ }
+  }, []);
+  useEffect(() => {
+    if (!takviyeyeGit || !takviye) return;
+    setTakviyeyeGit(false);
+    // Henüz takviye yoksa işaretlenecek bir şey de yok: listeyi kurduğu yere götür.
+    const bos = (takviye.items || []).length === 0;
+    if (bos) setTab('setup');
+    setTimeout(() => document.getElementById(bos ? 'takviye-duzen' : 'takviyeler')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' }), bos ? 500 : 50);
+  }, [takviyeyeGit, takviye]);
+
   if (!gun) return <Empty>{t('common.loading')}</Empty>;
 
   const bloklar = gun.blocks || [];
@@ -98,7 +113,9 @@ export default function MyDayPage() {
             ))}
           </Card>
 
-          <TakviyeKarti veri={takviye} repo={repo} t={t} yukle={yukle} bump={bump} />
+          <div id="takviyeler" className="kaydirma-hedefi">
+            <TakviyeKarti veri={takviye} repo={repo} t={t} yukle={yukle} bump={bump} />
+          </div>
 
           <Card title={t('gunum.goals')}>
             {hedefler.length === 0 && <Empty>{t('gunum.noGoals')}</Empty>}
@@ -274,7 +291,9 @@ function Duzen({ repo, t, yukle, bump, takviye }) {
         ))}
       </Card>
 
-      <TakviyeDuzeni repo={repo} t={t} veri={takviye} onDone={sonrasi} />
+      <div id="takviye-duzen" className="kaydirma-hedefi">
+        <TakviyeDuzeni repo={repo} t={t} veri={takviye} onDone={sonrasi} />
+      </div>
 
       {blokPanel && (
         <BlokPaneli repo={repo} t={t} scope={scope} blok={blokPanel.blok} mevcut={sirali}

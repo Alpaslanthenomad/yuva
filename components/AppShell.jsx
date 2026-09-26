@@ -21,6 +21,23 @@ export default function AppShell({ children }) {
   const { locale, applyHouseholdDefault } = useLocale();
   const [state, setState] = useState({ loading: true, household: null, members: [], me: null, user: null, accounts: [], categories: [], rates: {} });
   const [quickOpen, setQuickOpen] = useState(false);
+  const [quickInitial, setQuickInitial] = useState('expense');
+  // Ana ekran kısayolu (manifest "shortcuts"): /?quick=expense gibi adresle
+  // açılınca hızlı ekleme paneli o sekmeyle kendiliğinden açılır. Adres panel
+  // KAPANINCA temizlenir: kabuk açılışta dil ayarı yüzünden bir kez yeniden
+  // kurulabiliyor; adres erken silinirse panel kayboluyordu.
+  useEffect(() => {
+    try {
+      const q = new URLSearchParams(window.location.search).get('quick');
+      if (q && ['expense', 'event', 'task', 'shopping'].includes(q)) { setQuickInitial(q); setQuickOpen(true); }
+    } catch { /* adres okunamazsa kısayol yok sayılır */ }
+  }, []);
+  const quickKapat = () => {
+    setQuickOpen(false); setQuickInitial('expense');
+    try {
+      if (new URLSearchParams(window.location.search).get('quick')) window.history.replaceState(null, '', window.location.pathname);
+    } catch { /* */ }
+  };
   const [tick, setTick] = useState(0);
   // Bağlantı durumu. Uygulamanın çevrimdışı yazma kuyruğu YOK; bu yüzden
   // "senkron bekliyor" demek yanlış olurdu — çevrimdışıyken değişiklik
@@ -296,7 +313,7 @@ export default function AppShell({ children }) {
           <>
             <BottomNav />
             <button className="fab" aria-label={t('quick.title')} onClick={() => setQuickOpen(true)}>+</button>
-            {quickOpen && <QuickAdd onClose={() => setQuickOpen(false)} />}
+            {quickOpen && <QuickAdd initial={quickInitial} onClose={quickKapat} />}
           </>
         )}
       </div>

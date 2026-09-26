@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 
 const sw = readFileSync(new URL('../public/sw.js', import.meta.url), 'utf8');
 const shell = readFileSync(new URL('../components/AppShell.jsx', import.meta.url), 'utf8');
@@ -106,4 +106,20 @@ test('sürüm bilgisi derlemeye gömülüyor ve ekranda gösteriliyor', () => {
   assert.match(cfg, /VERCEL_GIT_COMMIT_SHA/);
   const ayarlar = readFileSync(new URL('../app/ayarlar/page.jsx', import.meta.url), 'utf8');
   assert.match(ayarlar, /NEXT_PUBLIC_BUILD/);
+});
+
+test('ana ekran kısayolları var olan sayfalara ve tanınan parametrelere gidiyor', () => {
+  const m = JSON.parse(readFileSync(new URL('../public/manifest.json', import.meta.url), 'utf8'));
+  assert.ok(m.shortcuts.length >= 3 && m.shortcuts.length <= 4, 'Android en fazla 4 kısayol gösterir');
+  const shell = readFileSync(new URL('../components/AppShell.jsx', import.meta.url), 'utf8');
+  const gunum = readFileSync(new URL('../app/gunum/page.jsx', import.meta.url), 'utf8');
+  const aile = readFileSync(new URL('../app/aile/page.jsx', import.meta.url), 'utf8');
+  for (const s of m.shortcuts) {
+    const u = new URL(s.url, 'https://x');
+    const sayfa = u.pathname === '/' ? 'app/page.jsx' : `app${u.pathname}page.jsx`;
+    assert.ok(existsSync(new URL('../' + sayfa, import.meta.url)), `${s.name}: ${sayfa} yok`);
+    if (u.searchParams.get('quick')) assert.match(shell, /get\('quick'\)/);
+    if (u.searchParams.get('takviye')) assert.match(gunum, /get\('takviye'\)/);
+    if (u.searchParams.get('bitir')) assert.match(aile, /get\('bitir'\)/);
+  }
 });

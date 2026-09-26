@@ -542,3 +542,6 @@ input[type="time"].input, input[type="date"].input {
 .bitir__metin { display: flex; flex-direction: column; gap: 2px; }
 .bitir__metin .faint { color: var(--color-brand-ink); opacity: .8; font-size: var(--fs-sm); }
 .bitir .btn--ghost { color: var(--color-brand-ink); background: transparent; align-self: center; }
+
+/* Kısayolla kaydırılan kart üst çubuğun altında kalmasın */
+.kaydirma-hedefi { scroll-margin-top: calc(var(--safe-t) + var(--sp-4)); }
