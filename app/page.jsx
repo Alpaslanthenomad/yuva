@@ -10,6 +10,7 @@ import { formatMoney, budgetState, dailyAllowance } from '../lib/money.js';
 import { holidayMap } from '../lib/holidays.js';
 import GununKaresi from '../components/GununKaresi.jsx';
 import BildirimAyarlari from '../components/BildirimAyarlari.jsx';
+import Yenilikler from '../components/Yenilikler.jsx';
 import { selamAnahtari } from '../lib/album.js';
 import { SHOPPING_CATALOG, catalogName, normalizeName } from '../lib/shoppingCatalog.js';
 
@@ -96,6 +97,9 @@ export default function TodayPage() {
       {/* Bu cihazda bildirim kapalıysa tek bir kart; açılınca ya da
           ertelenince bir daha görünmez. */}
       <BildirimAyarlari kompakt />
+
+      {/* Uygulamayı zaten kullananlara son eklenenler; bir kez görünür. */}
+      {!isFirstRun && <Yenilikler />}
 
       {isFirstRun ? <StartCard onQuick={app.openQuick} /> : <>
 
