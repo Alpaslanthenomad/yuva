@@ -552,3 +552,10 @@ input[type="time"].input, input[type="date"].input {
   background: var(--color-surface-2); font-size: var(--fs-sm); line-height: 1.5;
   display: flex; flex-direction: column; gap: 2px;
 }
+
+/* Fiş fotoğrafı (harcama formu ve kayıt onayı) */
+.fis { margin: var(--sp-3) 0; }
+.fis__var { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2); border-radius: var(--radius-md); background: var(--color-surface-2); }
+.fis__kucuk { flex: none; width: 64px; height: 64px; border-radius: var(--radius-sm, 8px); overflow: hidden; background: var(--color-surface); display: grid; place-items: center; font-size: 28px; }
+.fis__kucuk img { width: 100%; height: 100%; object-fit: cover; }
+.fis__metin { display: flex; flex-direction: column; gap: 4px; min-width: 0; }

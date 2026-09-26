@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useApp } from './AppShell.jsx';
 import ShoppingPicker from './ShoppingPicker.jsx';
+import FisAlani from './FisAlani.jsx';
 import { Sheet, Field } from './ui.jsx';
 import { useT, useLocale } from '../lib/i18n/context.jsx';
 import { parseAmount, minorToDecimal, formatMoney, CURRENCY_CODES, CURRENCIES } from '../lib/money.js';
@@ -147,6 +148,7 @@ export function ExpenseForm({ onDone, planId, txn, preset, checkoutListId }) {
         <div className="banner" style={{ background: 'var(--color-brand-soft)', color: 'var(--color-brand-ink)' }}>
           ✓ {t('quick.added')}: {kaydedilen.__ozet}
         </div>
+        {kaydedilen.kind === 'expense' && <FisAlani txn={kaydedilen} />}
         <div className="inline">
           <button type="button" className="btn btn--outline" style={{ flex: 1 }}
             onClick={() => setDuzeltmeAcik(true)}>
@@ -203,7 +205,7 @@ export function ExpenseForm({ onDone, planId, txn, preset, checkoutListId }) {
           // Alışverişi harcamaya çevirme: harcama ve işaretlilerin temizlenmesi
           // tek işlemde olmalı, yoksa ikincisi patlayınca aynı alışveriş
           // yeniden çevrilebiliyor (0016).
-          await repo.shopping.checkout(checkoutListId, row);
+          olusan = await repo.shopping.checkout(checkoutListId, row);
         } else {
           olusan = await repo.transactions.create({ ...row, paid_by_member_id: me?.id, plan_id: planId || null });
         }
@@ -329,6 +331,7 @@ export function ExpenseForm({ onDone, planId, txn, preset, checkoutListId }) {
       <Field label={t('money.date')}>
         <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
       </Field>
+      {kind === 'expense' && editing && <FisAlani txn={txn} />}
       {err && <div className="banner" style={{ color: 'var(--color-danger)' }}>{err}</div>}
       <button className="btn btn--block" disabled={busy}>{t('common.save')}</button>
       {editing && (

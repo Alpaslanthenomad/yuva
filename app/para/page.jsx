@@ -178,7 +178,7 @@ export default function MoneyPage() {
                 }
                 return (
                   <Row key={x.id} icon={x.kind === 'transfer' ? '🔁' : c?.icon || '🏷️'} title={x.merchant || c?.name || t('money.' + x.kind)}
-                    sub={`${fmtDay(x.occurred_on)} · ${accountById(x.account_id)?.name || ''}${x.for_member_id ? ` · 👤 ${memberById(x.for_member_id)?.display_name || t('money.personal')}` : ''}${x.plan_id ? ' · 🧭' : ''}`}
+                    sub={`${fmtDay(x.occurred_on)} · ${accountById(x.account_id)?.name || ''}${x.for_member_id ? ` · 👤 ${memberById(x.for_member_id)?.display_name || t('money.personal')}` : ''}${x.plan_id ? ' · 🧭' : ''}${x.receipt_path ? ' · 🧾' : ''}`}
                     end={<div><Money amount={x.amount} currency={x.currency} kind={x.kind} />{x.currency !== baseCurrency && <div className="faint">≈ {formatMoney(x.amount_base, baseCurrency)}</div>}</div>}
                     onClick={() => setEditTxn(x)} />
                 );
