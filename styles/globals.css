@@ -466,3 +466,66 @@ ul { margin: 0; padding: 0; list-style: none; }
 .seg-fit .seg { display: flex; width: 100%; overflow: hidden; }
 .seg-fit .seg__btn { flex: 1 1 0; min-width: 0; padding-left: 2px; padding-right: 2px;
   font-size: var(--fs-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- Günüm · Düzen: günün akışı (zaman çizelgesi) ---------- */
+.tl-list { display: flex; flex-direction: column; gap: var(--sp-2); }
+.tl {
+  --tl-c: var(--color-border);
+  display: flex; align-items: stretch; gap: 4px;
+  background: var(--color-surface-2); border-radius: var(--radius-md); overflow: hidden;
+}
+.tl[data-g="morning"] { --tl-c: var(--color-accent); }
+.tl[data-g="work"]    { --tl-c: var(--color-transfer); }
+.tl[data-g="body"]    { --tl-c: var(--color-expense); }
+.tl[data-g="mind"]    { --tl-c: var(--color-brand); }
+.tl[data-g="learn"]   { --tl-c: var(--color-warn); }
+.tl[data-g="family"]  { --tl-c: var(--color-income); }
+.tl[data-g="home"]    { --tl-c: var(--color-text-3); }
+.tl[data-g="evening"] { --tl-c: var(--color-text-2); }
+.tl__main {
+  flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-3) 0 var(--sp-3) var(--sp-3); text-align: left; color: inherit; background: none;
+}
+.tl__time { flex: none; width: 44px; display: flex; flex-direction: column; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.tl__time b { font-size: var(--fs-sm); }
+.tl__time small { font-size: var(--fs-xs); color: var(--color-text-3); }
+.tl__bar { flex: none; width: 4px; align-self: stretch; border-radius: 2px; background: var(--tl-c); }
+.tl__icon { flex: none; font-size: 24px; line-height: 1; }
+.tl__body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.tl__title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tl__sub { font-size: var(--fs-xs); color: var(--color-text-2); }
+.tl__warn { color: var(--color-warn); }
+.tl__bell { flex: none; width: 48px; font-size: 18px; background: none; }
+.tl__bell[aria-pressed="false"] { opacity: .55; }
+.tl-gap {
+  font-size: var(--fs-xs); color: var(--color-text-3); line-height: 1.6;
+  margin: 2px 0 2px calc(var(--sp-3) + 64px); padding: 2px 0 2px var(--sp-3);
+  border-left: 2px dashed var(--color-border);
+}
+.tl-hint { margin-top: var(--sp-3); font-size: var(--fs-xs); }
+.tl-empty { display: flex; flex-direction: column; align-items: center; gap: var(--sp-3); text-align: center; padding: var(--sp-2) 0; }
+.tl-empty__icon { font-size: 40px; }
+
+.blok-onizleme {
+  display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3);
+  background: var(--color-surface-2); border-radius: var(--radius-md); margin-bottom: var(--sp-3);
+}
+.blok-onizleme__icon { font-size: 32px; line-height: 1; }
+.blok-onizleme__title { font-weight: 700; }
+.grid-icon { display: grid; grid-template-columns: 72px 1fr; gap: var(--sp-3); }
+.input--icon { text-align: center; font-size: 22px; padding-left: 4px; padding-right: 4px; }
+.form-err { color: var(--color-danger); font-size: var(--fs-sm); margin: 0 0 var(--sp-2); }
+
+/* iOS: saat/tarih alanı kartın dışına taşmasın (yerel görünüm kendi
+   genişliğini dayatıyordu). */
+input[type="time"].input, input[type="date"].input {
+  -webkit-appearance: none; appearance: none; min-width: 0; max-width: 100%; display: block;
+}
+.grid-2 > *, .grid-icon > * { min-width: 0; }
+
+/* iOS ana ekran uygulaması: kaydırılan içerik saat/pil çubuğunun altına
+   girmesin — çubuğun arkasına sayfa renginde sabit bir şerit. */
+.shell::before {
+  content: ''; position: fixed; top: 0; left: 0; right: 0; height: var(--safe-t);
+  background: var(--color-bg); z-index: 30; pointer-events: none;
+}
